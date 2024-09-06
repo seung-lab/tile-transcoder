@@ -74,8 +74,8 @@ class ResumableFileSet:
         id {INTEGER} PRIMARY KEY {AUTOINC},
         source TEXT NOT NULL,
         dest TEXT NOT NULL,
-        recompress TEXT,
-        reencode TEXT,
+        recompress TEXT NULL,
+        reencode TEXT NULL,
         delete_original BOOLEAN DEFAULT FALSE,
         created INTEGER NOT NULL
       )
@@ -116,7 +116,7 @@ class ResumableFileSet:
     cur.execute("SELECT source, dest, recompress, reencode, delete_original, created FROM xfermeta LIMIT 1")
     row = cur.fetchone()
 
-    return {
+    meta = {
       "source": row[0],
       "dest": row[1],
       "recompress": row[2],
@@ -124,6 +124,14 @@ class ResumableFileSet:
       "delete_original": row[4],
       "created": row[5],
     }
+
+    if not meta["recompress"] or meta["recompress"] == '0':
+      meta["recompress"] = None
+
+    if not meta["reencode"] or meta["reencode"] == '0':
+      meta["reencode"] = None
+
+    return meta
 
   def mark_finished(self, fname_iter):
     cur = self.conn.cursor()
@@ -209,7 +217,7 @@ class ResumableTransfer:
     else:
       return (False, reencode)
 
-  def init(self, src, dest, paths=None, recompress=None, reencode=None):
+  def init(self, src, dest, paths=None, recompress=None, reencode=None, delete_original=False):
     if isinstance(paths, str):
       paths = list(CloudFiles(paths))
     elif isinstance(paths, CloudFiles):
@@ -219,14 +227,14 @@ class ResumableTransfer:
 
     (recompress, reencode) = self._normalize_compression(recompress, reencode)
 
-    self.rfs.create(src, dest, recompress, reencode)
+    self.rfs.create(src, dest, recompress, reencode, delete_original)
     self.rfs.insert(paths)
 
   def execute(self, progress=False, block_size=200):
     meta = self.rfs.metadata()
 
     cf_src = CloudFiles(meta["source"])
-    cf_dest = CloudFiles(meta["destination"])
+    cf_dest = CloudFiles(meta["dest"])
 
     total = self.rfs.total()
     pbar = tqdm(total=total, desc="Transfer", disable=(not progress))
@@ -238,7 +246,7 @@ class ResumableTransfer:
         if meta["reencode"] is None:
           cf_src.transfer_to(meta["dest"], paths=paths, reencode=meta["recompress"])
         else:
-          files = cf_src.get(paths)
+          files = cf_src.get(paths, return_dict=True)
 
           reencoded = []
           original_filenames = []
@@ -250,6 +258,7 @@ class ResumableTransfer:
               "content": new_binary,
               "raw": False,
               "content_type": content_type(meta["reencode"]),
+              "compress": None,
             })
 
           if meta["recompress"]:
