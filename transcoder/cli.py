@@ -53,12 +53,12 @@ def xferinit(source, encoding, compression, db):
   rt = ResumableTransfer(db)
   rt.init(source, source, source, recompress=compression, reencode=encoding)
 
-@cli_main.command("execute")
+@cli_main.command("worker")
 @click.argument("db")
 @click.option('--progress', is_flag=True, default=False, help="Show transfer progress.")
 @click.option('--lease-msec', default=0, help="(distributed transfers) Number of milliseconds to lease each task for.", show_default=True)
 @click.option('-b', '--block-size', default=200, help="Number of files to process at a time.", show_default=True)
-def xferexecute(db, progress, lease_msec, block_size):
+def worker(db, progress, lease_msec, block_size):
   """(2) Perform the transfer using the database.
 
   Multiple clients can use the same database
