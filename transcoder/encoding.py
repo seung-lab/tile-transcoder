@@ -29,7 +29,7 @@ def transcode_image(filename:str, binary:bytes, encoding:str) -> bytes:
   ext, binary = encode(img, encoding)
   return (basename + ext, binary)
 
-def decode(binary:bytes, encoding:str) -> bytes:
+def decode(binary:bytes, encoding:str) -> np.ndarray:
 
   check_installed(encoding)
 
