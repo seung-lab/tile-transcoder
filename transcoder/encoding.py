@@ -1,3 +1,10 @@
+from typing import (
+  Any, Dict, Optional, 
+  Union, List, Tuple, 
+  Callable, Generator, 
+  Iterable, cast
+)
+
 import numpy as np
 
 NEEDS_INSTALL = {}

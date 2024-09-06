@@ -11,7 +11,7 @@ def normalize_path(cloudpath):
     return "file://" + toabs(cloudpath)
   return cloudpath
 
-@click.group()
+@click.group("main")
 def cli_main():
   """
   Create named resumable transfers.
@@ -32,7 +32,7 @@ def cli_main():
   """
   pass
 
-@xfergroup.command("init")
+@cli_main.command("init")
 @click.argument("source", nargs=1)
 @click.option('-e', '--encoding', default='same', help="Destination encoding type. Options: same, png", show_default=True)
 @click.option('-c', '--compression', required=True, default='same', help="Destination compression type. Options: same, none, gzip, br, zstd", show_default=True)
@@ -53,7 +53,7 @@ def xferinit(source, encoding, compression, db):
   rt = ResumableTransfer(db)
   rt.init(source, source, source, recompress=compression, reencode=encoding)
 
-@xfergroup.command("execute")
+@cli_main.command("execute")
 @click.argument("db")
 @click.option('--progress', is_flag=True, default=False, help="Show transfer progress.")
 @click.option('--lease-msec', default=0, help="(distributed transfers) Number of milliseconds to lease each task for.", show_default=True)
