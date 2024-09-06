@@ -56,7 +56,14 @@ class ResumableFileSet:
     cur.execute("""DROP TABLE IF EXISTS xfermeta""")
     cur.close()
 
-  def create(self, src, dest, recompress=None, reencode=None):
+  def create(
+    self, 
+    src:str, 
+    dest:str, 
+    recompress:Optional[str] = None, 
+    reencode:Optional[str] = None, 
+    delete_original:bool = False,
+  ):
     cur = self.conn.cursor()
 
     cur.execute("""DROP TABLE IF EXISTS filelist""")
@@ -69,13 +76,15 @@ class ResumableFileSet:
         dest TEXT NOT NULL,
         recompress TEXT,
         reencode TEXT,
+        delete_original BOOLEAN DEFAULT FALSE,
         created INTEGER NOT NULL
       )
     """)
 
     cur.execute(
-      "INSERT INTO xfermeta VALUES (?,?,?,?,?,?)", [ 1, src, dest, recompress, reencode, now_msec() ]
-    );
+      "INSERT INTO xfermeta VALUES (?,?,?,?,?,?,?)", 
+      [ 1, src, dest, recompress, reencode, delete_original, now_msec() ]
+    )
 
     cur.execute(f"""
       CREATE TABLE filelist (
@@ -104,7 +113,7 @@ class ResumableFileSet:
 
   def metadata(self):
     cur = self.conn.cursor()
-    cur.execute("SELECT source, dest, recompress, reencode, created FROM xfermeta LIMIT 1")
+    cur.execute("SELECT source, dest, recompress, reencode, delete_original, created FROM xfermeta LIMIT 1")
     row = cur.fetchone()
 
     return {
@@ -112,7 +121,8 @@ class ResumableFileSet:
       "dest": row[1],
       "recompress": row[2],
       "reencode": row[3],
-      "created": row[4],
+      "delete_original": row[4],
+      "created": row[5],
     }
 
   def mark_finished(self, fname_iter):
@@ -183,13 +193,21 @@ class ResumableFileSet:
     return self.next()
 
 class ResumableTransfer:
-  def __init__(self, db_path, lease_msec=0, delete_original=False):
+  def __init__(self, db_path, lease_msec=0):
     self.db_path = db_path
     self.rfs = ResumableFileSet(db_path, lease_msec)
-    self.delete_original = delete_original
 
   def __len__(self):
     return len(self.rfs)
+
+  def _normalize_compression(self, recompress, reencode):
+    # disable bitstream compression unless the 
+    # format supports uncompressed output. 
+    # e.g. for png, jpeg etc do not apply bitstream compression
+    if reencode in ('bmp', 'tiff'):
+      return (recompress, reencode)
+    else:
+      return (False, reencode)
 
   def init(self, src, dest, paths=None, recompress=None, reencode=None):
     if isinstance(paths, str):
@@ -198,6 +216,8 @@ class ResumableTransfer:
       paths = list(paths)
     elif paths is None:
       paths = list(CloudFiles(src))
+
+    (recompress, reencode) = self._normalize_compression(recompress, reencode)
 
     self.rfs.create(src, dest, recompress, reencode)
     self.rfs.insert(paths)
@@ -239,7 +259,7 @@ class ResumableTransfer:
 
           cf_dest.puts(reencoded, raw=True)
 
-        if self.delete_original:
+        if meta["delete_original"]:
           cf_src.delete(original_filenames)
         
         self.rfs.mark_finished(paths)
