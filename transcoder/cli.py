@@ -67,3 +67,24 @@ def worker(db, progress, lease_msec, block_size):
   rt = ResumableTransfer(db, lease_msec)
   rt.execute(progress=progress, block_size=block_size)
   rt.close()
+
+@cli_main.command("status")
+@click.argument("db")
+def status(db):
+  """Print how many tasks are enqueued."""
+  rt = ResumableTransfer(db)
+  total = rt.rfs.total()
+  remaining = rt.rfs.remaining()
+  print(f"{remaining} remaining ({remaining/total*100.0:.2f}%)")
+  print(f"{total} total")
+
+@cli_main.command("release")
+@click.argument("db")
+def release(db):
+  """Release all leased tasks to the available pool."""
+  rt = ResumableTransfer(db)
+  rt.rfs.release()
+
+
+
+
