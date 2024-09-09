@@ -48,7 +48,7 @@ class ResumableFileSet:
     self.lease_msec = int(lease_msec)
     
     self._total = 0
-    self._total_dirty = False
+    self._total_dirty = True
 
   def __del__(self):
     self.conn.close()
