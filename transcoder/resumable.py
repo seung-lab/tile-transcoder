@@ -141,7 +141,7 @@ class ResumableFileSet:
       "dest": row[1],
       "recompress": row[2],
       "reencode": row[3],
-      "level": row[4],
+      "encoding_level": row[4],
       "delete_original": row[5],
       "created": row[6],
     }
@@ -152,8 +152,8 @@ class ResumableFileSet:
     if not meta["reencode"] or meta["reencode"] == '0':
       meta["reencode"] = None
 
-    if not meta["level"] or meta["level"] == '0':
-      meta["level"] = None    
+    if not meta["encoding_level"] or meta["encoding_level"] == '0':
+      meta["encoding_level"] = None    
 
     return meta
 
@@ -286,7 +286,7 @@ class ResumableTransfer:
           original_filenames = []
           for filename, binary in files.items():
             original_filenames.append(filename)
-            new_filename, new_binary = transcode_image(filename, binary, meta["reencode"], meta["level"])
+            new_filename, new_binary = transcode_image(filename, binary, meta["reencode"], meta["encoding_level"])
             reencoded.append({
               "path": new_filename,
               "content": new_binary,

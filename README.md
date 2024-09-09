@@ -18,7 +18,7 @@ source = "file://...." # a cloudfiles cloudpath
 dest = "gs://...." # a cloudfiles cloudpath, can be same as source
 
 # populates the database with the transfer
-rt.init(source, dest, paths, recompress=compression, reencode=encoding)
+rt.init(source, dest, paths, recompress=compression, reencode=encoding, encoding_level=85, delete_original=False)
 ```
 
 # Listing 2: Run Workers
@@ -26,7 +26,7 @@ rt.init(source, dest, paths, recompress=compression, reencode=encoding)
 Run one worker per a process, e.g. in SLURM.
 
 ```bash
-transcode worker xfer.db --progress --lease-msec 60000
+transcode worker xfer.db --progress --lease-msec 60000 --block-size 20
 ```
 
 
