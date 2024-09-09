@@ -71,6 +71,7 @@ class ResumableFileSet:
 
     cur.execute("""DROP TABLE IF EXISTS filelist""")
     cur.execute("""DROP TABLE IF EXISTS xfermeta""")
+    cur.execute("""DROP TABLE IF EXISTS stats""")
 
     cur.execute(f"""
       CREATE TABLE xfermeta (
@@ -125,7 +126,8 @@ class ResumableFileSet:
       cur.execute(f"INSERT INTO filelist(filename,finished,lease) VALUES {bindlist}", filenames)
       cur.execute("commit")
 
-    cur.close()    
+    cur.close()
+    self._total_dirty = True
 
   def metadata(self):
     cur = self.conn.cursor()
