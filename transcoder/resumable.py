@@ -286,7 +286,7 @@ class ResumableTransfer:
           original_filenames = []
           for filename, binary in files.items():
             original_filenames.append(filename)
-            new_filename, new_binary = transcode_image(filename, binary, meta["reencode"])
+            new_filename, new_binary = transcode_image(filename, binary, meta["reencode"], meta["level"])
             reencoded.append({
               "path": new_filename,
               "content": new_binary,
