@@ -46,6 +46,9 @@ class ResumableFileSet:
   def __init__(self, db_path, lease_msec=0):
     self.conn = sqlite3.connect(db_path)
     self.lease_msec = int(lease_msec)
+    
+    self._total = 0
+    self._total_dirty = False
 
   def __del__(self):
     self.conn.close()
@@ -90,12 +93,25 @@ class ResumableFileSet:
       CREATE TABLE filelist (
         id {INTEGER} PRIMARY KEY {AUTOINC},
         filename TEXT NOT NULL,
-        finished INTEGER NOT NULL,
-        lease INTEGER NOT NULL
+        finished {INTEGER} NOT NULL,
+        lease {INTEGER} NOT NULL
       )
     """)
     cur.execute("CREATE INDEX resumableidxfin ON filelist(finished,lease)")
     cur.execute("CREATE INDEX resumableidxfile ON filelist(filename)")
+
+    cur.execute(f"""
+      CREATE TABLE stats (
+        id {INTEGER} PRIMARY KEY {AUTOINC},
+        key TEXT NOT NULL,
+        value {INTEGER}
+      )
+    """)
+    cur.execute(
+      "INSERT INTO stats(id, key, value) VALUES (?,?,?)",
+      [1, 'finished', 0]
+    )
+
     cur.close()
 
   def insert(self, fname_iter):
@@ -139,6 +155,7 @@ class ResumableFileSet:
     for filenames in sip(fname_iter, SQLITE_MAX_PARAMS):
       bindlist = ",".join([f"{BIND}"] * len(filenames))
       cur.execute(f"UPDATE filelist SET finished = 1 WHERE filename in ({bindlist})", filenames)
+      cur.execute(f"UPDATE stats SET value = value + {len(filenames)} WHERE id = 1")
       cur.execute("commit")
     cur.close()
 
@@ -169,18 +186,27 @@ class ResumableFileSet:
     cur.close()
 
   def total(self):
+    """Returns the total number of tasks (both processed and unprocessed)."""
+    if not self._total_dirty:
+      return self._total
+
     cur = self.conn.cursor()
     cur.execute(f"SELECT max(id) FROM filelist")
+    res = cur.fetchone()
+    cur.close()
+    self._total = int(res[0])
+    self._total_dirty = False
+    return self._total
+
+  def finished(self):
+    cur = self.conn.cursor()
+    cur.execute(f"SELECT value FROM stats WHERE id = 1")
     res = cur.fetchone()
     cur.close()
     return int(res[0])
 
   def remaining(self):
-    cur = self.conn.cursor()
-    cur.execute(f"SELECT count(filename) FROM filelist WHERE finished = 0")
-    res = cur.fetchone()
-    cur.close()
-    return int(res[0])
+    return self.total() - self.finished()
 
   def available(self):
     cur = self.conn.cursor()
