@@ -5,7 +5,7 @@ Tile Transcoder is a utility for bulk moving and converting 2D image tiles.
 
 It works on a very similar principle to CloudFiles transfer, but with support for re-encoding the image files as well as handling bitstream compression.
 
-Currently supports: `.bmp`, `.png`, `'.jpeg'`, `.jxl`, `.tiff`
+Currently supports: `.bmp`, `.png`, `.jpeg`, `.jxl`, `.tiff`
 
 # Listing 1: Create Database
 
