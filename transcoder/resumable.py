@@ -81,7 +81,7 @@ class ResumableFileSet:
         dest TEXT NOT NULL,
         recompress TEXT NULL,
         reencode TEXT NULL,
-        level {INTEGER} NULL,
+        encoding_level {INTEGER} NULL,
         delete_original BOOLEAN DEFAULT FALSE,
         created {INTEGER} NOT NULL
       )
@@ -133,7 +133,7 @@ class ResumableFileSet:
 
   def metadata(self):
     cur = self.conn.cursor()
-    cur.execute("SELECT source, dest, recompress, reencode, level, delete_original, created FROM xfermeta LIMIT 1")
+    cur.execute("SELECT source, dest, recompress, reencode, encoding_level, delete_original, created FROM xfermeta LIMIT 1")
     row = cur.fetchone()
 
     meta = {
