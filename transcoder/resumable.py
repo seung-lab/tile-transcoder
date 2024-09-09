@@ -170,7 +170,7 @@ class ResumableFileSet:
 
   def total(self):
     cur = self.conn.cursor()
-    cur.execute(f"SELECT count(filename) FROM filelist")
+    cur.execute(f"SELECT max(id) FROM filelist")
     res = cur.fetchone()
     cur.close()
     return int(res[0])
