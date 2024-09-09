@@ -64,7 +64,8 @@ class ResumableFileSet:
     src:str, 
     dest:str, 
     recompress:Optional[str] = None, 
-    reencode:Optional[str] = None, 
+    reencode:Optional[str] = None,
+    level:Optional[int] = None,
     delete_original:bool = False,
   ):
     cur = self.conn.cursor()
@@ -80,14 +81,15 @@ class ResumableFileSet:
         dest TEXT NOT NULL,
         recompress TEXT NULL,
         reencode TEXT NULL,
+        level {INTEGER} NULL,
         delete_original BOOLEAN DEFAULT FALSE,
-        created INTEGER NOT NULL
+        created {INTEGER} NOT NULL
       )
     """)
 
     cur.execute(
-      "INSERT INTO xfermeta VALUES (?,?,?,?,?,?,?)", 
-      [ 1, src, dest, recompress, reencode, delete_original, now_msec() ]
+      "INSERT INTO xfermeta VALUES (?,?,?,?,?,?,?,?)", 
+      [ 1, src, dest, recompress, reencode, delete_original, level, now_msec() ]
     )
 
     cur.execute(f"""
@@ -131,7 +133,7 @@ class ResumableFileSet:
 
   def metadata(self):
     cur = self.conn.cursor()
-    cur.execute("SELECT source, dest, recompress, reencode, delete_original, created FROM xfermeta LIMIT 1")
+    cur.execute("SELECT source, dest, recompress, reencode, level, delete_original, created FROM xfermeta LIMIT 1")
     row = cur.fetchone()
 
     meta = {
@@ -139,8 +141,9 @@ class ResumableFileSet:
       "dest": row[1],
       "recompress": row[2],
       "reencode": row[3],
-      "delete_original": row[4],
-      "created": row[5],
+      "level": row[4],
+      "delete_original": row[5],
+      "created": row[6],
     }
 
     if not meta["recompress"] or meta["recompress"] == '0':
@@ -148,6 +151,9 @@ class ResumableFileSet:
 
     if not meta["reencode"] or meta["reencode"] == '0':
       meta["reencode"] = None
+
+    if not meta["level"] or meta["level"] == '0':
+      meta["level"] = None    
 
     return meta
 

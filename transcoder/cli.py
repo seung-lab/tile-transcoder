@@ -36,8 +36,9 @@ def cli_main():
 @click.argument("source", nargs=1)
 @click.option('-e', '--encoding', default='same', help="Destination encoding type. Options: same, png", show_default=True)
 @click.option('-c', '--compression', required=True, default='same', help="Destination compression type. Options: same, none, gzip, br, zstd", show_default=True)
+@click.option('-l', '--level', default=None, type=int, help="Encoding level for jpeg (0-100),jpegxl (0-100, 100=lossless),png (0-9).", show_default=True)
 @click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
-def xferinit(source, encoding, compression, db):
+def xferinit(source, encoding, compression, db, level):
   """(1) Create db of files from the source."""
   if compression == "same":
     compression = None
@@ -51,7 +52,7 @@ def xferinit(source, encoding, compression, db):
   destination = normalize_path(destination)
 
   rt = ResumableTransfer(db)
-  rt.init(source, source, source, recompress=compression, reencode=encoding)
+  rt.init(source, source, source, recompress=compression, reencode=encoding, level=level)
 
 @cli_main.command("worker")
 @click.argument("db")

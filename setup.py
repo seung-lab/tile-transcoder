@@ -7,6 +7,7 @@ PNG_DEPS = [ "pyspng-seunglab" ]
 BMP_DEPS = [ "Pillow" ]
 TIFF_DEPS = [ "tifffile" ]
 JPEG_DEPS = [ "simplejpeg" ]
+JPEGXL_DEPS = [ "imagecodecs" ]
 
 setuptools.setup(
   setup_requires=['pbr'],
@@ -16,7 +17,8 @@ setuptools.setup(
     "bmp": BMP_DEPS,
     "jpeg": JPEG_DEPS,
     "tiff": TIFF_DEPS,
-    "all": PNG_DEPS + BMP_DEPS + TIFF_DEPS + JPEG_DEPS,
+    "jxl": JPEGXL_DEPS,
+    "all": PNG_DEPS + BMP_DEPS + TIFF_DEPS + JPEG_DEPS + JPEGXL_DEPS,
   },
   include_package_data=True,
   entry_points={
