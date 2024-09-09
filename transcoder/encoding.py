@@ -33,6 +33,11 @@ try:
 except ImportError:
   NEEDS_INSTALL["jxl"] = "imagecodecs"
 
+try:
+  import tifffile
+except ImportError:
+  NEEDS_INSTALL["tiff"] = "tifffile"
+
 def check_installed(encoding):
   if encoding in NEEDS_INSTALL:
     raise ImportError(f"Optional codec {encoding} is not installed. Run: pip install {NEEDS_INSTALL[encoding]}")
@@ -73,6 +78,8 @@ def decode(binary:bytes, encoding:str) -> np.ndarray:
     return simplejpeg.decode_jpeg(binary)
   elif encoding in ["jpegxl", "jxl"]:
     return imagecodecs.jpegxl_decode(binary)
+  elif encoding in ["tiff", "tif"]:
+    return tiff_to_npy(binary)
   else:
     raise EncodingNotSupported(f"{encoding}")
 
@@ -88,6 +95,8 @@ def encode(img:np.ndarray, encoding:str, level:Optional[int]) -> Tuple[str, byte
     return (".jpeg", encode_jpeg(img, level))
   elif encoding in ["jpegxl", "jxl"]:
     return (".jxl", encode_jpegxl(img, level))
+  elif encoding in ["tiff", "tif"]:
+    return npy_to_tiff(img)
   else:
     raise EncodingNotSupported(f"{encoding}")
 
@@ -98,6 +107,16 @@ def bmp_to_npy(binary:bytes) -> np.ndarray:
 def npy_to_bmp(img:np.ndarray) -> bytes:
   buf = io.BytesIO()
   Image.fromarray(img).save(buf, format="BMP")
+  buf.seek(0)
+  return buf.read()
+
+def tiff_to_npy(binary:bytes) -> np.ndarray:
+  buf = io.BytesIO(binary)
+  return tifffile.imread(buf)
+
+def npy_to_tiff(img:np.ndarray) -> bytes:
+  buf = io.BytesIO()
+  tifffile.imwrite(buf, img, photometric='minisblack')
   buf.seek(0)
   return buf.read()
 
