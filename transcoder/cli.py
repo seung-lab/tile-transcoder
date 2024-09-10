@@ -83,7 +83,11 @@ def status(db):
   rt = ResumableTransfer(db)
   total = rt.rfs.total()
   remaining = rt.rfs.remaining()
+  completed = total - remaining
+  leased = rt.rfs.num_leased()
   print(f"{remaining} remaining ({remaining/total*100.0:.2f}%)")
+  print(f"{completed} completed ({completed/total*100.0:.2f}%)")
+  print(f"{leased} leased ({leased/total*100.0:.2f}%)")
   print(f"{total} total")
 
 @cli_main.command("release")

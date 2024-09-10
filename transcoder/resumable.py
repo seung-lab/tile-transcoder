@@ -193,40 +193,45 @@ class ResumableFileSet:
 
     cur.close()
 
+  def _scalar_query(self, sql:str) -> int:
+    cur = self.conn.cursor()
+    cur.execute(sql)
+    res = cur.fetchone()
+    cur.close()
+    return int(res[0])
+
   def total(self):
     """Returns the total number of tasks (both processed and unprocessed)."""
     if not self._total_dirty:
       return self._total
 
-    cur = self.conn.cursor()
-    cur.execute(f"SELECT max(id) FROM filelist")
-    res = cur.fetchone()
-    cur.close()
-    self._total = int(res[0])
+    self._total = self._scalar_query(f"SELECT max(id) FROM filelist")
     self._total_dirty = False
     return self._total
 
   def finished(self):
-    cur = self.conn.cursor()
-    cur.execute(f"SELECT value FROM stats WHERE id = 1")
-    res = cur.fetchone()
-    cur.close()
-    return int(res[0])
+    return self._scalar_query(f"SELECT value FROM stats WHERE id = 1")
 
   def remaining(self):
     return self.total() - self.finished()
 
+  def num_leased(self):
+    ts = int(now_msec())
+    return self._scalar_query(
+      f"SELECT count(filename) FROM filelist WHERE finished = 0 AND lease > {ts}"
+    )
+
   def available(self):
-    cur = self.conn.cursor()
-    ts = int(now_msec() + self.lease_msec)
-    cur.execute(f"SELECT count(filename) FROM filelist WHERE finished = 0 AND lease < {ts}")
-    res = cur.fetchone()
-    cur.close()
-    return int(res[0])
+    ts = int(now_msec())
+    return self._scalar_query(
+      f"SELECT count(filename) FROM filelist WHERE finished = 0 AND lease <= {ts}"
+    )
 
   def release(self):
+    cur = self.conn.cursor()
     cur.execute(f"UPDATE filelist SET lease = 0")
     cur.execute("commit")
+    cur.close()
 
   def __len__(self):
     return self.remaining()
