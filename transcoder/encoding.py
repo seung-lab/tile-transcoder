@@ -62,8 +62,18 @@ def transcode_image(
   elif src_encoding in ["jpegxl", "jxl"] and encoding == "jpeg" and level is None:
     return (basename + ".jpeg", jpegxl_decode_jpeg(binary))
   else:
-    img = decode(binary, src_encoding)
-    ext, binary = encode(img, encoding, level)
+    try:
+      img = decode(binary, src_encoding)
+    except:
+      print(filename)
+      raise
+
+    try:
+      ext, binary = encode(img, encoding, level)
+    except:
+      print(filename)
+      raise
+    
     return (basename + ext, binary)
 
 def decode(binary:bytes, encoding:str) -> np.ndarray:

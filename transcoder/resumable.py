@@ -105,7 +105,7 @@ class ResumableFileSet:
     cur.execute("CREATE INDEX resumableidxfile ON filelist(filename)")
 
     cur.execute(f"""
-      CRATE TABLE errors (
+      CREATE TABLE errors (
         id {INTEGER} PRIMARY KEY {AUTOINC},
         filename TEXT NOT NULL,
         error TEXT NOT NULL,
@@ -278,17 +278,31 @@ class ResumableTransfer:
     else:
       return (False, reencode)
 
-  def init(self, src, dest, paths=None, recompress=None, reencode=None, delete_original=False):
+  def init(
+    self, 
+    src:str, 
+    dest:str, 
+    paths:Optional[str] = None, 
+    recompress:Optional[str] = None, 
+    reencode:Optional[str] = None, 
+    delete_original:bool = False, 
+    level:Optional[int] = None,
+  ):
     if isinstance(paths, str):
-      paths = list(CloudFiles(paths))
+      paths = CloudFiles(paths).list()
     elif isinstance(paths, CloudFiles):
-      paths = list(paths)
+      paths = paths.list()
     elif paths is None:
-      paths = list(CloudFiles(src))
+      paths = CloudFiles(src).list()
 
     (recompress, reencode) = self._normalize_compression(recompress, reencode)
 
-    self.rfs.create(src, dest, recompress, reencode, delete_original)
+    self.rfs.create(
+      src, dest, 
+      recompress, reencode,
+      level=level,
+      delete_original=delete_original, 
+    )
     self.rfs.insert(paths)
 
   def execute(self, progress=False, block_size=200):
