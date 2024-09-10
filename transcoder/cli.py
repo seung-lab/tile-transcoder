@@ -1,6 +1,8 @@
 import click
 
+from cloudfiles import CloudFiles
 from cloudfiles.paths import get_protocol
+from cloudfiles.lib import toabs
 
 from .resumable import ResumableTransfer
 
@@ -33,13 +35,15 @@ def cli_main():
   pass
 
 @cli_main.command("init")
-@click.argument("source", nargs=1)
-@click.option('-e', '--encoding', default='same', help="Destination encoding type. Options: same, png", show_default=True)
-@click.option('-c', '--compression', required=True, default='same', help="Destination compression type. Options: same, none, gzip, br, zstd", show_default=True)
-@click.option('-l', '--level', default=None, type=int, help="Encoding level for jpeg (0-100),jpegxl (0-100, 100=lossless),png (0-9).", show_default=True)
-@click.option('-d', '--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
+@click.argument("source", required=True)
+@click.argument("destination", required=False)
+@click.option('--encoding', default='same', help="Destination encoding type. Options: same, png", show_default=True)
+@click.option('--compression', required=True, default='same', help="Destination compression type. Options: same, none, gzip, br, zstd", show_default=True)
+@click.option('--level', default=None, type=int, help="Encoding level for jpeg (0-100),jpegxl (0-100, 100=lossless),png (0-9).", show_default=True)
+@click.option('--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
+@click.option('--ext', default=None, help="If present, filter files for this extension.")
 @click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
-def xferinit(source, encoding, compression, db, level, delete_original):
+def xferinit(source, destination, encoding, compression, db, level, delete_original, ext):
   """(1) Create db of files from the source."""
   if compression == "same":
     compression = None
@@ -50,15 +54,23 @@ def xferinit(source, encoding, compression, db, level, delete_original):
     encoding = None
 
   source = normalize_path(source)
-  destination = normalize_path(destination)
+
+  if destination is None:
+    destination = source
+  else:
+    destination = normalize_path(destination)
+
+  paths = CloudFiles(source).list()
+  if ext:
+    paths = ( p for p in paths if p.endswith(f'.{ext}') )
 
   rt = ResumableTransfer(db)
   rt.init(
-    source, source, source, 
+    source, source, paths,
     recompress=compression, 
     reencode=encoding, 
     level=level, 
-    delete_original=delete_original
+    delete_original=delete_original,
   )
 
 @cli_main.command("worker")
@@ -85,9 +97,11 @@ def status(db):
   remaining = rt.rfs.remaining()
   completed = total - remaining
   leased = rt.rfs.num_leased()
+  errors = rt.rfs.num_errors()
   print(f"{remaining} remaining ({remaining/total*100.0:.2f}%)")
   print(f"{completed} completed ({completed/total*100.0:.2f}%)")
   print(f"{leased} leased ({leased/total*100.0:.2f}%)")
+  print(f"{errors} errors ({errors/total*100.0:.2f}%)")
   print(f"{total} total")
 
 @cli_main.command("release")

@@ -9,6 +9,7 @@ import datetime
 import io
 import os
 import sqlite3
+import sys
 
 from tqdm import tqdm
 
@@ -58,6 +59,7 @@ class ResumableFileSet:
     cur.execute("""DROP TABLE IF EXISTS filelist""")
     cur.execute("""DROP TABLE IF EXISTS xfermeta""")
     cur.execute("""DROP TABLE IF EXISTS stats""")
+    cur.execute("""DROP TABLE IF EXISTS errors""")
     cur.close()
 
   def create(
@@ -74,6 +76,7 @@ class ResumableFileSet:
     cur.execute("""DROP TABLE IF EXISTS filelist""")
     cur.execute("""DROP TABLE IF EXISTS xfermeta""")
     cur.execute("""DROP TABLE IF EXISTS stats""")
+    cur.execute("""DROP TABLE IF EXISTS errors""")
 
     cur.execute(f"""
       CREATE TABLE xfermeta (
@@ -89,8 +92,10 @@ class ResumableFileSet:
     """)
 
     cur.execute(
-      "INSERT INTO xfermeta VALUES (?,?,?,?,?,?,?,?)", 
-      [ 1, src, dest, recompress, reencode, delete_original, level, now_msec() ]
+      """INSERT INTO xfermeta 
+      (id, source, dest, recompress, reencode, encoding_level, delete_original, created) 
+      VALUES (?,?,?,?,?,?,?,?)""", 
+      [ 1, src, dest, recompress, reencode, level, delete_original, now_msec() ]
     )
 
     cur.execute(f"""
@@ -105,6 +110,15 @@ class ResumableFileSet:
     cur.execute("CREATE INDEX resumableidxfile ON filelist(filename)")
 
     cur.execute(f"""
+      CREATE TABLE errors (
+        id {INTEGER} PRIMARY KEY {AUTOINC},
+        filename TEXT NOT NULL,
+        error TEXT NOT NULL,
+        created {INTEGER} NOT NULL
+      )
+    """)
+
+    cur.execute(f"""
       CREATE TABLE stats (
         id {INTEGER} PRIMARY KEY {AUTOINC},
         key TEXT NOT NULL,
@@ -116,6 +130,25 @@ class ResumableFileSet:
       [1, 'finished', 0]
     )
 
+    cur.close()
+
+  def errors(self, n=1000):
+    cur = self.conn.cursor()
+    cur.execute(f"SELECT filename, error, created FROM errors LIMIT {int(n)}")
+    results = cur.fetchmany()
+    cur.close()
+    return results
+
+  def record_error(self, filename, error):
+    cur = self.conn.cursor()
+    cur.execute(
+      "INSERT INTO errors (filename, error, created) VALUES (?,?,?)",
+      [filename, str(error), now_msec()]
+    )
+    cur.execute(
+      "UPDATE filelist SET finished = 2 WHERE filename = ?", 
+      [filename]
+    )
     cur.close()
 
   def insert(self, fname_iter):
@@ -201,7 +234,7 @@ class ResumableFileSet:
     cur.close()
     return int(res[0])
 
-  def total(self):
+  def total(self) -> int:
     """Returns the total number of tasks (both processed and unprocessed)."""
     if not self._total_dirty:
       return self._total
@@ -210,19 +243,25 @@ class ResumableFileSet:
     self._total_dirty = False
     return self._total
 
-  def finished(self):
+  def finished(self) -> int:
     return self._scalar_query(f"SELECT value FROM stats WHERE id = 1")
 
-  def remaining(self):
+  def remaining(self) -> int:
     return self.total() - self.finished()
 
-  def num_leased(self):
+  def num_leased(self) -> int:
     ts = int(now_msec())
     return self._scalar_query(
       f"SELECT count(filename) FROM filelist WHERE finished = 0 AND lease > {ts}"
     )
 
-  def available(self):
+  def num_errors(self) -> int:
+    return self._scalar_query(f"SELECT count(*) from errors")
+
+  def has_errors(self) -> bool:
+    return self._scalar_query(f"SELECT count(*) from errors limit 1") > 0
+
+  def available(self) -> int:
     ts = int(now_msec())
     return self._scalar_query(
       f"SELECT count(filename) FROM filelist WHERE finished = 0 AND lease <= {ts}"
@@ -257,17 +296,31 @@ class ResumableTransfer:
     else:
       return (False, reencode)
 
-  def init(self, src, dest, paths=None, recompress=None, reencode=None, delete_original=False):
+  def init(
+    self, 
+    src:str, 
+    dest:str, 
+    paths:Optional[str] = None, 
+    recompress:Optional[str] = None, 
+    reencode:Optional[str] = None, 
+    delete_original:bool = False, 
+    level:Optional[int] = None,
+  ):
     if isinstance(paths, str):
-      paths = list(CloudFiles(paths))
+      paths = CloudFiles(paths).list()
     elif isinstance(paths, CloudFiles):
-      paths = list(paths)
+      paths = paths.list()
     elif paths is None:
-      paths = list(CloudFiles(src))
+      paths = CloudFiles(src).list()
 
     (recompress, reencode) = self._normalize_compression(recompress, reencode)
 
-    self.rfs.create(src, dest, recompress, reencode, delete_original)
+    self.rfs.create(
+      src, dest, 
+      recompress, reencode,
+      level=level,
+      delete_original=delete_original, 
+    )
     self.rfs.insert(paths)
 
   def execute(self, progress=False, block_size=200):
@@ -291,8 +344,13 @@ class ResumableTransfer:
           reencoded = []
           original_filenames = []
           for filename, binary in files.items():
+            try:
+              new_filename, new_binary = transcode_image(filename, binary, meta["reencode"], meta["encoding_level"])
+            except Exception as err:
+              self.rfs.record_error(filename, err)
+              continue
+            
             original_filenames.append(filename)
-            new_filename, new_binary = transcode_image(filename, binary, meta["reencode"], meta["encoding_level"])
             reencoded.append({
               "path": new_filename,
               "content": new_binary,
@@ -317,6 +375,10 @@ class ResumableTransfer:
         pbar.refresh()
 
   def close(self):
+    if self.rfs.has_errors():
+      print("There were errors during processing. Keeping the database intact.", file=sys.stderr)
+      return
+
     self.rfs.delete()
     try:
       os.remove(self.db_path)
