@@ -4,9 +4,10 @@ from typing import (
   Callable, Generator, 
   Iterable, cast
 )
-import os
-import io
 
+import io
+import os
+import sys
 
 import numpy as np
 
@@ -65,15 +66,15 @@ def transcode_image(
     try:
       img = decode(binary, src_encoding)
     except:
-      print(filename)
+      print(f"Decoding Error: {filename}", file=sys.stderr)
       raise
 
     try:
       ext, binary = encode(img, encoding, level)
     except:
-      print(filename)
+      print(f"Encoding Error: {filename}", file=sys.stderr)
       raise
-    
+
     return (basename + ext, binary)
 
 def decode(binary:bytes, encoding:str) -> np.ndarray:

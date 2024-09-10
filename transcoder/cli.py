@@ -70,7 +70,7 @@ def xferinit(source, destination, encoding, compression, db, level, delete_origi
     recompress=compression, 
     reencode=encoding, 
     level=level, 
-    delete_original=delete_original
+    delete_original=delete_original,
   )
 
 @cli_main.command("worker")
@@ -97,9 +97,11 @@ def status(db):
   remaining = rt.rfs.remaining()
   completed = total - remaining
   leased = rt.rfs.num_leased()
+  errors = rt.rfs.num_errors()
   print(f"{remaining} remaining ({remaining/total*100.0:.2f}%)")
   print(f"{completed} completed ({completed/total*100.0:.2f}%)")
   print(f"{leased} leased ({leased/total*100.0:.2f}%)")
+  print(f"{errors} errors ({errors/total*100.0:.2f}%)")
   print(f"{total} total")
 
 @cli_main.command("release")
