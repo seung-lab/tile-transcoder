@@ -57,6 +57,7 @@ class ResumableFileSet:
     cur = self.conn.cursor()
     cur.execute("""DROP TABLE IF EXISTS filelist""")
     cur.execute("""DROP TABLE IF EXISTS xfermeta""")
+    cur.execute("""DROP TABLE IF EXISTS stats""")
     cur.close()
 
   def create(
