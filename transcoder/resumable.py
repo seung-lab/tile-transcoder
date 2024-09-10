@@ -105,6 +105,15 @@ class ResumableFileSet:
     cur.execute("CREATE INDEX resumableidxfile ON filelist(filename)")
 
     cur.execute(f"""
+      CRATE TABLE errors (
+        id {INTEGER} PRIMARY KEY {AUTOINC},
+        filename TEXT NOT NULL,
+        error TEXT NOT NULL,
+        created {INTEGER} NOT NULL
+      )
+    """)
+
+    cur.execute(f"""
       CREATE TABLE stats (
         id {INTEGER} PRIMARY KEY {AUTOINC},
         key TEXT NOT NULL,
@@ -116,6 +125,18 @@ class ResumableFileSet:
       [1, 'finished', 0]
     )
 
+    cur.close()
+
+  def record_error(self, filename, error):
+    cur = self.conn.cursor()
+    cur.execute(
+      "INSERT INTO errors (filename, error, created) VALUES (?,?,?)",
+      [filename, str(error), now_msec()]
+    )
+    cur.execute(
+      "UPDATE filelist SET finished = 2 WHERE filename = ?", 
+      [filename]
+    )
     cur.close()
 
   def insert(self, fname_iter):
@@ -291,8 +312,13 @@ class ResumableTransfer:
           reencoded = []
           original_filenames = []
           for filename, binary in files.items():
+            try:
+              new_filename, new_binary = transcode_image(filename, binary, meta["reencode"], meta["encoding_level"])
+            except Exception as err:
+              self.rfs.record_error(filename, err)
+              continue
+            
             original_filenames.append(filename)
-            new_filename, new_binary = transcode_image(filename, binary, meta["reencode"], meta["encoding_level"])
             reencoded.append({
               "path": new_filename,
               "content": new_binary,
