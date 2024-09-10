@@ -37,7 +37,7 @@ def cli_main():
 @click.option('-e', '--encoding', default='same', help="Destination encoding type. Options: same, png", show_default=True)
 @click.option('-c', '--compression', required=True, default='same', help="Destination compression type. Options: same, none, gzip, br, zstd", show_default=True)
 @click.option('-l', '--level', default=None, type=int, help="Encoding level for jpeg (0-100),jpegxl (0-100, 100=lossless),png (0-9).", show_default=True)
-@click.option('-d', '--delete-original', default=False, flag=True, help="Deletes the original file after transcoding.", show_default=True)
+@click.option('-d', '--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
 @click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
 def xferinit(source, encoding, compression, db, level, delete_original):
   """(1) Create db of files from the source."""
