@@ -330,8 +330,12 @@ class ResumableTransfer:
     cf_dest = CloudFiles(meta["dest"])
 
     total = self.rfs.total()
-    pbar = tqdm(total=total, desc="Transfer", disable=(not progress))
-    pbar.n = total - self.rfs.remaining()
+    pbar = tqdm(
+      initial=self.rfs.finished(), 
+      total=total, 
+      desc="Transfer", 
+      disable=(not progress)
+    )
 
     with pbar:
       pbar.refresh()
@@ -371,7 +375,7 @@ class ResumableTransfer:
         
         self.rfs.mark_finished(paths)
         
-        pbar.n = total - self.rfs.remaining()
+        pbar.n = self.rfs.finished()
         pbar.refresh()
 
   def close(self):
