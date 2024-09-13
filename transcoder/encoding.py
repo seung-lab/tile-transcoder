@@ -48,6 +48,7 @@ def transcode_image(
   binary:bytes, 
   encoding:str, 
   level:Optional[int],
+  **kwargs,
 ) -> bytes:
   basename, ext = os.path.splitext(filename)
 
@@ -70,7 +71,7 @@ def transcode_image(
       raise
 
     try:
-      ext, binary = encode(img, encoding, level)
+      ext, binary = encode(img, encoding, level, **kwargs)
     except:
       print(f"Encoding Error: {filename}", file=sys.stderr)
       raise
@@ -94,7 +95,12 @@ def decode(binary:bytes, encoding:str) -> np.ndarray:
   else:
     raise EncodingNotSupported(f"{encoding}")
 
-def encode(img:np.ndarray, encoding:str, level:Optional[int]) -> Tuple[str, bytes]:
+def encode(
+  img:np.ndarray, 
+  encoding:str, 
+  level:Optional[int],
+  **kwargs,
+) -> Tuple[str, bytes]:
 
   check_installed(encoding)
 
@@ -105,7 +111,11 @@ def encode(img:np.ndarray, encoding:str, level:Optional[int]) -> Tuple[str, byte
   elif encoding == "jpeg":
     return (".jpeg", encode_jpeg(img, level))
   elif encoding in ["jpegxl", "jxl"]:
-    return (".jxl", encode_jpegxl(img, level))
+    return (".jxl", encode_jpegxl(
+      img, level, 
+      effort=int(kwargs.get("effort", 3)),
+      decodingspeed=int(kwargs.get("decodingspeed", 0)),
+    ))
   elif encoding in ["tiff", "tif"]:
     return npy_to_tiff(img)
   else:
@@ -131,7 +141,7 @@ def npy_to_tiff(img:np.ndarray) -> bytes:
   buf.seek(0)
   return buf.read()
 
-def encode_jpegxl(arr, level):
+def encode_jpegxl(arr, level, effort, decodingspeed):
   if not np.issubdtype(arr.dtype, np.uint8):
     raise ValueError(f"Only accepts uint8 arrays. Got: {arr.dtype}")
 
@@ -139,7 +149,7 @@ def encode_jpegxl(arr, level):
   lossless = level >= 100
 
   if level is None:
-    level = 85
+    level = 90 # visually lossless
 
   if num_channel != 1:
     raise ValueError(f"Number of image channels should be 1. 3 possible, but not implemented. Got: {arr.shape[3]}")
@@ -149,6 +159,8 @@ def encode_jpegxl(arr, level):
     photometric="GRAY",
     level=level,
     lossless=lossless,
+    effort=effort,
+    decodingspeed=decodingspeed,
   )
 
 def encode_jpeg(arr, quality):

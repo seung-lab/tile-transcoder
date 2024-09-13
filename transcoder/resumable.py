@@ -70,6 +70,7 @@ class ResumableFileSet:
     reencode:Optional[str] = None,
     level:Optional[int] = None,
     delete_original:bool = False,
+    encoding_options:Dict[str,int] = {}
   ):
     cur = self.conn.cursor()
 
@@ -86,16 +87,22 @@ class ResumableFileSet:
         recompress TEXT NULL,
         reencode TEXT NULL,
         encoding_level {INTEGER} NULL,
+        encoding_options TEXT NULL,
         delete_original BOOLEAN DEFAULT FALSE,
         created {INTEGER} NOT NULL
       )
     """)
 
+    encoding_options_serialized = ";".join([
+      f"{k}={int(v)}"
+      for k,v in encoding_options.items()
+    ])
+
     cur.execute(
       """INSERT INTO xfermeta 
-      (id, source, dest, recompress, reencode, encoding_level, delete_original, created) 
+      (id, source, dest, recompress, reencode, encoding_level, encoding_options, delete_original, created) 
       VALUES (?,?,?,?,?,?,?,?)""", 
-      [ 1, src, dest, recompress, reencode, level, delete_original, now_msec() ]
+      [ 1, src, dest, recompress, reencode, level, encoding_options_serialized, delete_original, now_msec() ]
     )
 
     cur.execute(f"""
@@ -167,7 +174,14 @@ class ResumableFileSet:
 
   def metadata(self):
     cur = self.conn.cursor()
-    cur.execute("SELECT source, dest, recompress, reencode, encoding_level, delete_original, created FROM xfermeta LIMIT 1")
+    cur.execute("""
+      SELECT 
+        source, dest, recompress, reencode, 
+        encoding_level, encoding_options,
+        delete_original, created 
+      FROM xfermeta 
+      LIMIT 1
+    """)
     row = cur.fetchone()
 
     meta = {
@@ -176,8 +190,9 @@ class ResumableFileSet:
       "recompress": row[2],
       "reencode": row[3],
       "encoding_level": row[4],
-      "delete_original": row[5],
-      "created": row[6],
+      "encoding_options": row[5],
+      "delete_original": row[6],
+      "created": row[7],
     }
 
     if not meta["recompress"] or meta["recompress"] == '0':
@@ -187,7 +202,16 @@ class ResumableFileSet:
       meta["reencode"] = None
 
     if not meta["encoding_level"] or meta["encoding_level"] == '0':
-      meta["encoding_level"] = None    
+      meta["encoding_level"] = None
+
+    if not meta["encoding_options"] or meta["encoding_options"] == '0':
+      meta["encoding_options"] = {}
+    else:
+      meta["encoding_options"] = meta["encoding_options"].split(";")
+      meta["encoding_options"] = {
+        pair.split("=")[0]: int(pair.split("=")[1])
+        for pair in meta["encoding_options"]
+      }
 
     return meta
 
@@ -349,7 +373,11 @@ class ResumableTransfer:
           original_filenames = []
           for filename, binary in files.items():
             try:
-              new_filename, new_binary = transcode_image(filename, binary, meta["reencode"], meta["encoding_level"])
+              new_filename, new_binary = transcode_image(
+                filename, binary, 
+                meta["reencode"], meta["encoding_level"],
+                **meta["encoding_options"]
+              )
             except Exception as err:
               self.rfs.record_error(filename, err)
               continue

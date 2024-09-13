@@ -40,18 +40,36 @@ def cli_main():
 @click.option('--encoding', default='same', help="Destination encoding type. Options: same, png", show_default=True)
 @click.option('--compression', required=True, default='same', help="Destination compression type. Options: same, none, gzip, br, zstd", show_default=True)
 @click.option('--level', default=None, type=int, help="Encoding level for jpeg (0-100),jpegxl (0-100, 100=lossless),png (0-9).", show_default=True)
+@click.option('--jxl-effort', default=3, type=int, help="(jpegxl) Set effort for jpegxl encoding 1-10.", show_default=True)
+@click.option('--jxl-decoding-speed', default=0, type=int, help="(jpegxl) Prioritize faster decoding 0-4 (0: default).", show_default=True)
 @click.option('--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
 @click.option('--ext', default=None, help="If present, filter files for this extension.")
 @click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
-def xferinit(source, destination, encoding, compression, db, level, delete_original, ext):
+def xferinit(
+  source, destination, 
+  encoding, compression, 
+  db, level, 
+  delete_original, ext,
+  jxl_effort, jxl_decoding_speed,
+):
   """(1) Create db of files from the source."""
   if compression == "same":
     compression = None
   elif compression == "none":
     compression = False
 
+  encoding = encoding.lower()
+
   if encoding == "same":
     encoding = None
+  elif encoding == "jxl":
+    encoding = "jpegxl"
+
+  compression_params = {}
+
+  if encoding == "jpegxl":
+    compression_params["effort"] = int(jxl_effort)
+    compression_params["decodingspeed"] = int(jxl_decoding_speed)
 
   source = normalize_path(source)
 
@@ -67,10 +85,11 @@ def xferinit(source, destination, encoding, compression, db, level, delete_origi
   rt = ResumableTransfer(db)
   rt.init(
     source, source, paths,
-    recompress=compression, 
+    recompress=compression,
     reencode=encoding, 
     level=level, 
     delete_original=delete_original,
+    compression_params=compression_params,
   )
 
 @cli_main.command("worker")
