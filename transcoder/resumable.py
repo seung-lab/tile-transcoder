@@ -101,7 +101,7 @@ class ResumableFileSet:
     cur.execute(
       """INSERT INTO xfermeta 
       (id, source, dest, recompress, reencode, encoding_level, encoding_options, delete_original, created) 
-      VALUES (?,?,?,?,?,?,?,?)""", 
+      VALUES (?,?,?,?,?,?,?,?,?)""", 
       [ 1, src, dest, recompress, reencode, level, encoding_options_serialized, delete_original, now_msec() ]
     )
 
@@ -329,6 +329,7 @@ class ResumableTransfer:
     reencode:Optional[str] = None, 
     delete_original:bool = False, 
     level:Optional[int] = None,
+    encoding_options:dict = {},
   ):
     if isinstance(paths, str):
       paths = CloudFiles(paths).list()
@@ -344,6 +345,7 @@ class ResumableTransfer:
       recompress, reencode,
       level=level,
       delete_original=delete_original, 
+      encoding_options=encoding_options,
     )
     self.rfs.insert(paths)
 

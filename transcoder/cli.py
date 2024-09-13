@@ -65,11 +65,11 @@ def xferinit(
   elif encoding == "jxl":
     encoding = "jpegxl"
 
-  compression_params = {}
+  encoding_options = {}
 
   if encoding == "jpegxl":
-    compression_params["effort"] = int(jxl_effort)
-    compression_params["decodingspeed"] = int(jxl_decoding_speed)
+    encoding_options["effort"] = int(jxl_effort)
+    encoding_options["decodingspeed"] = int(jxl_decoding_speed)
 
   source = normalize_path(source)
 
@@ -89,7 +89,7 @@ def xferinit(
     reencode=encoding, 
     level=level, 
     delete_original=delete_original,
-    compression_params=compression_params,
+    encoding_options=encoding_options,
   )
 
 @cli_main.command("worker")

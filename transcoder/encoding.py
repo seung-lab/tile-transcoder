@@ -145,17 +145,23 @@ def encode_jpegxl(arr, level, effort, decodingspeed):
   if not np.issubdtype(arr.dtype, np.uint8):
     raise ValueError(f"Only accepts uint8 arrays. Got: {arr.dtype}")
 
-  num_channel = arr.shape[2]
-  lossless = level >= 100
+  num_channel = 1
+  if len(arr.shape) > 2:
+    num_channel = arr.shape[2]
 
   if level is None:
     level = 90 # visually lossless
 
+  lossless = level >= 100
+
   if num_channel != 1:
     raise ValueError(f"Number of image channels should be 1. 3 possible, but not implemented. Got: {arr.shape[3]}")
 
+  while len(arr.shape) > 2:
+    arr = arr[...,0]
+
   return imagecodecs.jpegxl_encode(
-    arr[:,:,0],
+    arr[:,:],
     photometric="GRAY",
     level=level,
     lossless=lossless,
