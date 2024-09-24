@@ -97,14 +97,15 @@ def xferinit(
 @click.option('--progress', is_flag=True, default=False, help="Show transfer progress.")
 @click.option('--lease-msec', default=0, help="(distributed transfers) Number of milliseconds to lease each task for.", show_default=True)
 @click.option('-b', '--block-size', default=200, help="Number of files to process at a time.", show_default=True)
-def worker(db, progress, lease_msec, block_size):
+@click.option('--verbose', is_flag=True, default=False, help="Print more about what the worker is doing.", show_default=True)
+def worker(db, progress, lease_msec, block_size, verbose):
   """(2) Perform the transfer using the database.
 
   Multiple clients can use the same database
   for execution.
   """
   rt = ResumableTransfer(db, lease_msec)
-  rt.execute(progress=progress, block_size=block_size)
+  rt.execute(progress=progress, block_size=block_size, verbose=verbose)
   rt.close()
 
 @cli_main.command("status")

@@ -349,7 +349,7 @@ class ResumableTransfer:
     )
     self.rfs.insert(paths)
 
-  def execute(self, progress=False, block_size=200):
+  def execute(self, progress=False, block_size=200, verbose=False):
     meta = self.rfs.metadata()
 
     cf_src = CloudFiles(meta["source"])
@@ -375,12 +375,17 @@ class ResumableTransfer:
           original_filenames = []
           for filename, binary in files.items():
             try:
+              if verbose:
+                print(f"{filename} to {meta['reencode']}")
+
               new_filename, new_binary = transcode_image(
                 filename, binary, 
                 meta["reencode"], meta["encoding_level"],
                 **meta["encoding_options"]
               )
             except Exception as err:
+              if verbose:
+                print(f"{filename} error: {err}")
               self.rfs.record_error(filename, err)
               continue
             
