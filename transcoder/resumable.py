@@ -352,8 +352,11 @@ class ResumableTransfer:
   def execute(self, progress=False, block_size=200, verbose=False):
     meta = self.rfs.metadata()
 
-    cf_src = CloudFiles(meta["source"])
+    cf_src = CloudFiles(meta["source"], progress=bool(verbose))
     cf_dest = CloudFiles(meta["dest"])
+
+    if verbose:
+      print(f"Executing PID {os.getpid()}...")
 
     total = self.rfs.total()
     pbar = tqdm(
