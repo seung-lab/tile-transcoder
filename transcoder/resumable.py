@@ -44,8 +44,8 @@ class ResumableFileSet:
   An interface to an sqlite database for starting and resuming
   resumable uploads or downloads.
   """
-  def __init__(self, db_path, lease_msec=0):
-    self.conn = sqlite3.connect(db_path)
+  def __init__(self, db_path, lease_msec=0, timeout=5.0):
+    self.conn = sqlite3.connect(db_path, timeout=timeout)
     self.lease_msec = int(lease_msec)
     
     self._total = 0
@@ -304,11 +304,11 @@ class ResumableFileSet:
     return self.next()
 
 class ResumableTransfer:
-  def __init__(self, db_path, lease_msec=0):
+  def __init__(self, db_path:str, lease_msec:int = 0, db_timeout:float = 5.0):
     self.db_path = db_path
-    self.rfs = ResumableFileSet(db_path, lease_msec)
+    self.rfs = ResumableFileSet(db_path, lease_msec, timeout=db_timeout)
 
-  def __len__(self):
+  def __len__(self) -> int:
     return len(self.rfs)
 
   def _normalize_compression(self, recompress, reencode):
@@ -349,7 +349,20 @@ class ResumableTransfer:
     )
     self.rfs.insert(paths)
 
-  def execute(self, progress=False, block_size=200, verbose=False):
+  def execute(
+    self, 
+    progress:bool = False, 
+    block_size:int = 200,
+    verbose:bool = False,
+  ):
+    """
+    Start working through tasks in the database.
+
+    progress: show progress bar
+    block_size: how many items to download and process at once
+    timeout: how long to wait for a sqlite lock to release
+    verbose: print what the worker is doing
+    """
     meta = self.rfs.metadata()
 
     cf_src = CloudFiles(meta["source"], progress=bool(verbose))

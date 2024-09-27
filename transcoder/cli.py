@@ -98,13 +98,14 @@ def xferinit(
 @click.option('--lease-msec', default=0, help="(distributed transfers) Number of milliseconds to lease each task for.", show_default=True)
 @click.option('-b', '--block-size', default=200, help="Number of files to process at a time.", show_default=True)
 @click.option('--verbose', is_flag=True, default=False, help="Print more about what the worker is doing.", show_default=True)
-def worker(db, progress, lease_msec, block_size, verbose):
+@click.option('--db-timeout', default=5.0, type=float, help="How long to wait when the SQLite DB is locked. Use higher values under multi-process contention.", show_default=True)
+def worker(db, progress, lease_msec, block_size, verbose, db_timeout):
   """(2) Perform the transfer using the database.
 
   Multiple clients can use the same database
   for execution.
   """
-  rt = ResumableTransfer(db, lease_msec)
+  rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
   rt.execute(progress=progress, block_size=block_size, verbose=verbose)
   rt.close()
 
