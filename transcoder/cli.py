@@ -84,7 +84,7 @@ def xferinit(
 
   rt = ResumableTransfer(db)
   rt.init(
-    source, source, paths,
+    source, destination, paths,
     recompress=compression,
     reencode=encoding, 
     level=level, 
