@@ -21,16 +21,16 @@ DEST="$DEST/$BSEQ/$SECTION"
 
 mkdir -p $DEST
 
-DBNAME=$(mktmp).db
+DBNAME=$(mktemp).db
 
 NCPU=20
 
 cp $SOURCE/*.jpg $DEST/
 cp -r $SOURCE/metadata $DEST/
 cp -r $SOURCE/montage $DEST/
-cp -r $SOURCE/subtiles/metadata $DEST/subtiles/
+cp -r $SOURCE/subtiles/metadata/ $DEST/subtiles/
 
-transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --jxl-effort 3 --jxl-decodingspeed 0
+transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --jxl-effort 3 --jxl-decoding-speed 0
 parallel -j $NCPU -N0 "transcode worker -b 1 $DBNAME" :: $(seq $NCPU)
 rm $DBNAME
 
