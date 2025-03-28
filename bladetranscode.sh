@@ -1,3 +1,4 @@
+#!/bin/bash
 # assumes SOURCE looks like
 # .../bladeseq-2025.02.07-16.47.17/
 # DEST looks like
