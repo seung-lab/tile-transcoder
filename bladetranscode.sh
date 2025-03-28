@@ -21,9 +21,9 @@ DEST="$DEST/$BSEQ/$SECTION"
 
 mkdir -p $DEST
 
-DBNAME=$(mktemp).db
+DBNAME=/home/voxa/transcode_dbs/transcode-$(date +%s).db
 
-NCPU=16
+NCPU=18
 
 cp $SOURCE/*.jpg $DEST/
 cp -r $SOURCE/metadata $DEST/
@@ -32,7 +32,7 @@ mkdir -p $DEST/subtiles/metadata/
 cp -r $SOURCE/subtiles/metadata/ $DEST/subtiles/
 
 echo "Database: $DBNAME"
-transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --level 100 --jxl-effort 1 --jxl-decoding-speed 0
+transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --level 100 --jxl-effort 3 --jxl-decoding-speed 0
 parallel -j $NCPU -N0 "transcode worker -b 1 $DBNAME" ::: $(seq $NCPU)
 rm $DBNAME
 
@@ -61,7 +61,7 @@ get_file_size() {
 for fname in $(ls $DEST/subtiles); do
 	fqpath="$DEST/subtiles/$fname"
 	size=$(get_file_size $fqpath)
-	if [[ $size -eq 0 ]]; then
+	if [[ $size -eq 0 && ! -d $fqpath ]]; then
 		echo "$fqpath was zero bytes. Maybe the copy operation failed?"
 		exit 1
 	fi
