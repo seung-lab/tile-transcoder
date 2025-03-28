@@ -23,24 +23,23 @@ mkdir -p $DEST
 
 DBNAME=$(mktemp).db
 
-NCPU=20
+NCPU=16
 
 cp $SOURCE/*.jpg $DEST/
 cp -r $SOURCE/metadata $DEST/
 cp -r $SOURCE/montage $DEST/
+mkdir -p $DEST/subtiles/metadata/
 cp -r $SOURCE/subtiles/metadata/ $DEST/subtiles/
 
-transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --jxl-effort 3 --jxl-decoding-speed 0
-parallel -j $NCPU -N0 "transcode worker -b 1 $DBNAME" :: $(seq $NCPU)
+echo "Database: $DBNAME"
+transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --level 100 --jxl-effort 1 --jxl-decoding-speed 0
+parallel -j $NCPU -N0 "transcode worker -b 1 $DBNAME" ::: $(seq $NCPU)
 rm $DBNAME
 
 bmp_files=$(find "$SOURCE/subtiles" -type f -name '*.bmp' -printf '%f\n' | sed 's/\.bmp$//' | sort)
 jxl_files=$(find "$DEST/subtiles" -type f -name '*.jxl' -printf '%f\n' | sed 's/\.jxl$//' | sort)
 
-# Compare the file sets
-diff_result=$(diff <(echo "$bmp_files") <(echo "$jxl_files"))
-
-if [ -n "$diff_result" ]; then
+if [[ "$bmp_files" != "$jxl_files" ]]; then
     echo "Error: Directory contents differ:"
     echo "$diff_result"
     exit 1
