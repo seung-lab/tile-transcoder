@@ -232,6 +232,7 @@ class ResumableFileSet:
 
     while True:
       ts = now_msec()
+      cur.execute("BEGIN EXCLUSIVE TRANSACTION")
       cur.execute(f"""SELECT filename FROM filelist WHERE finished = 0 AND lease <= {ts} LIMIT {int(block_size)}""")
       rows = cur.fetchmany(block_size)
       N += len(rows)
