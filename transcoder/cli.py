@@ -99,7 +99,8 @@ def xferinit(
 @click.option('-b', '--block-size', default=200, help="Number of files to process at a time.", show_default=True)
 @click.option('--verbose', is_flag=True, default=False, help="Print more about what the worker is doing.", show_default=True)
 @click.option('--db-timeout', default=5.0, type=float, help="How long to wait when the SQLite DB is locked. Use higher values under multi-process contention.", show_default=True)
-def worker(db, progress, lease_msec, block_size, verbose, db_timeout):
+@click.option('--cleanup', is_flag=True, default=False, help="Delete the database when finished.")
+def worker(db, progress, lease_msec, block_size, verbose, db_timeout, cleanup):
   """(2) Perform the transfer using the database.
 
   Multiple clients can use the same database
@@ -107,7 +108,8 @@ def worker(db, progress, lease_msec, block_size, verbose, db_timeout):
   """
   rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
   rt.execute(progress=progress, block_size=block_size, verbose=verbose)
-  rt.close()
+  if cleanup:
+    rt.close()
 
 @cli_main.command("status")
 @click.argument("db")
