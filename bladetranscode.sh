@@ -24,7 +24,7 @@ mkdir -p $DEST
 
 DBNAME=/home/voxa/transcode_dbs/transcode-$(date +%s).db
 
-NCPU=18
+NCPU=25
 
 cp $SOURCE/*.jpg $DEST/
 cp -r $SOURCE/metadata $DEST/
@@ -35,7 +35,7 @@ cp -r $SOURCE/subtiles/metadata/ $DEST/subtiles/
 echo "Database: $DBNAME"
 transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --level 100 --jxl-effort 3 --jxl-decoding-speed 0
 parallel -j $NCPU -N0 "transcode worker -b 1 $DBNAME" ::: $(seq $NCPU)
-rm $DBNAME
+# rm $DBNAME
 
 bmp_files=$(find "$SOURCE/subtiles" -type f -name '*.bmp' -printf '%f\n' | sed 's/\.bmp$//' | sort)
 jxl_files=$(find "$DEST/subtiles" -type f -name '*.jxl' -printf '%f\n' | sed 's/\.jxl$//' | sort)
