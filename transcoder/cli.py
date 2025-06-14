@@ -1,10 +1,17 @@
 import click
+import os.path
+import time
+
+import multiprocessing as mp
+from tqdm import tqdm
 
 from cloudfiles import CloudFiles
 from cloudfiles.paths import get_protocol
 from cloudfiles.lib import toabs
 
 from .resumable import ResumableTransfer
+
+mp.set_start_method("spawn", force=True)
 
 SUPPORTED_ENCODINGS = set([ 'bmp', 'png' ])
 
@@ -92,22 +99,73 @@ def xferinit(
     encoding_options=encoding_options,
   )
 
+def _do_work(db, lease_msec, db_timeout, block_size, verbose):
+  rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
+  rt.execute(progress=False, block_size=block_size, verbose=verbose)
+
 @cli_main.command("worker")
 @click.argument("db")
+@click.option('-p', '--parallel', default=1, type=int, help="Number of workers.")
 @click.option('--progress', is_flag=True, default=False, help="Show transfer progress.")
 @click.option('--lease-msec', default=0, help="(distributed transfers) Number of milliseconds to lease each task for.", show_default=True)
 @click.option('-b', '--block-size', default=200, help="Number of files to process at a time.", show_default=True)
 @click.option('--verbose', is_flag=True, default=False, help="Print more about what the worker is doing.", show_default=True)
 @click.option('--db-timeout', default=5.0, type=float, help="How long to wait when the SQLite DB is locked. Use higher values under multi-process contention.", show_default=True)
 @click.option('--cleanup', is_flag=True, default=False, help="Delete the database when finished.")
-def worker(db, progress, lease_msec, block_size, verbose, db_timeout, cleanup):
+def worker(
+  db, progress, 
+  lease_msec, block_size, 
+  verbose, db_timeout, 
+  cleanup, parallel
+):
   """(2) Perform the transfer using the database.
 
   Multiple clients can use the same database
   for execution.
   """
+  assert parallel > 0 and int(parallel) == parallel
+  assert block_size > 0
+  assert lease_msec >= 0
+
+  if parallel > 1 and lease_msec == 0:
+    print("Parallel workers require you to set lease_msec to avoid highly duplicated work.")
+    return
+
+  if not os.path.exists(db):
+    print(f"Database {db} does not exist. Did you call transcode init?")
+    return
+  
   rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
-  rt.execute(progress=progress, block_size=block_size, verbose=verbose)
+
+  processes = []
+  remaining = len(rt)
+
+  for _ in range(parallel):
+    p = mp.Process(
+      target=_do_work, 
+      args=(db, lease_msec, db_timeout, block_size, verbose)
+    )
+    p.start()
+    processes.append(p)
+
+  total = rt.rfs.total()
+  completed = total - remaining
+
+  with tqdm(
+    desc="Tiles Transcoded", 
+    total=total,
+    initial=completed,
+    disable=(not progress),
+  ) as pbar:
+    while (remaining := len(rt)) > 0:
+      completed = total - remaining
+      pbar.n = completed
+      pbar.refresh()
+      time.sleep(0.5)
+
+  for p in processes:
+    p.join()
+
   if cleanup:
     rt.close()
 

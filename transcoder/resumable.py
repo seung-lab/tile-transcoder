@@ -44,10 +44,17 @@ class ResumableFileSet:
   An interface to an sqlite database for starting and resuming
   resumable uploads or downloads.
   """
-  def __init__(self, db_path, lease_msec=0, timeout=5.0):
+  def __init__(
+    self, 
+    db_path:str, 
+    lease_msec:int = 0, 
+    timeout:float = 5.0,
+    default_reservation:int = 200,
+  ):
     self.conn = sqlite3.connect(db_path, timeout=timeout)
     self.lease_msec = int(lease_msec)
-    
+    self.default_reservation = int(default_reservation)
+
     self._total = 0
     self._total_dirty = True
 
@@ -225,16 +232,19 @@ class ResumableFileSet:
       cur.execute("commit")
     cur.close()
 
-  def next(self, limit=None, block_size=200):
+  def next(self, limit=None, reservation=None):
     cur = self.conn.cursor()
+
+    if reservation is None:
+      reservation = self.default_reservation
 
     N = 0
 
     while True:
       ts = now_msec()
       cur.execute("BEGIN EXCLUSIVE TRANSACTION")
-      cur.execute(f"""SELECT filename FROM filelist WHERE finished = 0 AND lease <= {ts} LIMIT {int(block_size)}""")
-      rows = cur.fetchmany(block_size)
+      cur.execute(f"""SELECT filename FROM filelist WHERE finished = 0 AND lease <= {ts} LIMIT {int(reservation)}""")
+      rows = cur.fetchmany(reservation)
       N += len(rows)
       if len(rows) == 0:
         break
@@ -364,6 +374,8 @@ class ResumableTransfer:
     timeout: how long to wait for a sqlite lock to release
     verbose: print what the worker is doing
     """
+    self.rfs.default_reservation = block_size
+
     meta = self.rfs.metadata()
 
     cf_src = CloudFiles(meta["source"], progress=bool(verbose))
