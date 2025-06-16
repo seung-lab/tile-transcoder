@@ -163,6 +163,11 @@ def worker(
       pbar.refresh()
       time.sleep(0.5)
 
+    total = rt.rfs.total()
+    completed = total - remaining
+    pbar.n = completed
+    pbar.refresh()
+
   for p in processes:
     p.join()
 
