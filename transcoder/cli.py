@@ -110,13 +110,15 @@ def _do_work(db, lease_msec, db_timeout, block_size, verbose):
 @click.option('--lease-msec', default=0, help="(distributed transfers) Number of milliseconds to lease each task for.", show_default=True)
 @click.option('-b', '--block-size', default=200, help="Number of files to process at a time.", show_default=True)
 @click.option('--verbose', is_flag=True, default=False, help="Print more about what the worker is doing.", show_default=True)
-@click.option('--db-timeout', default=5.0, type=float, help="How long to wait when the SQLite DB is locked. Use higher values under multi-process contention.", show_default=True)
+@click.option('--db-timeout', default=5.0, type=float, help="How many seconds to wait when the SQLite DB is locked. Use higher values under multi-process contention.", show_default=True)
+@click.option('--ramp-sec', default=0.0, type=float, help="How many seconds to wait between launching additional processes.", show_default=True)
 @click.option('--cleanup', is_flag=True, default=False, help="Delete the database when finished.")
 def worker(
   db, progress, 
   lease_msec, block_size, 
   verbose, db_timeout, 
-  cleanup, parallel
+  cleanup, parallel,
+  ramp_sec,
 ):
   """(2) Perform the transfer using the database.
 
@@ -137,39 +139,43 @@ def worker(
   
   rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
 
-  processes = []
   remaining = len(rt)
+  total = rt.rfs.total()
+  completed = total - remaining
 
+  pbar = tqdm(
+    desc="Tiles Transcoded", 
+    total=total,
+    initial=completed,
+    disable=(not progress),
+  )
+
+  def update_pbar():
+    remaining = len(rt)
+    completed = total - remaining
+    pbar.n = completed
+    pbar.refresh()
+    return remaining
+
+  processes = []
   for _ in range(parallel):
     p = mp.Process(
       target=_do_work, 
       args=(db, lease_msec, db_timeout, block_size, verbose)
     )
     p.start()
+    if ramp_sec > 0:
+      time.sleep(ramp_sec)
+      update_pbar()
     processes.append(p)
 
-  total = rt.rfs.total()
-  completed = total - remaining
-
-  with tqdm(
-    desc="Tiles Transcoded", 
-    total=total,
-    initial=completed,
-    disable=(not progress),
-  ) as pbar:
-    while (remaining := len(rt)) > 0:
-      completed = total - remaining
-      pbar.n = completed
-      pbar.refresh()
-      time.sleep(0.5)
-
-    total = rt.rfs.total()
-    completed = total - remaining
-    pbar.n = completed
-    pbar.refresh()
+  while update_pbar() > 0:
+    time.sleep(0.5)
 
   for p in processes:
     p.join()
+
+  pbar.close()
 
   if cleanup:
     rt.close()

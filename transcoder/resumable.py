@@ -240,10 +240,11 @@ class ResumableFileSet:
 
     N = 0
 
+    ts = now_msec()
+
     while True:
-      ts = now_msec()
       cur.execute("BEGIN EXCLUSIVE TRANSACTION")
-      cur.execute(f"""SELECT filename FROM filelist WHERE finished = 0 AND lease <= {ts} LIMIT {int(reservation)}""")
+      cur.execute(f"""SELECT filename FROM filelist WHERE finished = 0 AND lease < {ts} LIMIT {int(reservation)}""")
       rows = cur.fetchmany(reservation)
       N += len(rows)
       if len(rows) == 0:
@@ -251,7 +252,7 @@ class ResumableFileSet:
       
       filenames = [ x[0] for x in rows ]
       bindlist = ",".join([f"{BIND}"] * len(filenames))
-      ts = now_msec() + self.lease_msec
+      lease_msec = now_msec() + self.lease_msec
       cur.execute(f"UPDATE filelist SET lease = {ts} WHERE filename in ({bindlist})", filenames)
       cur.execute("commit")
 
