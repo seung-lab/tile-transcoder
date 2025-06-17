@@ -13,8 +13,6 @@ from .resumable import ResumableTransfer
 
 mp.set_start_method("spawn", force=True)
 
-SUPPORTED_ENCODINGS = set([ 'bmp', 'png' ])
-
 def normalize_path(cloudpath):
   if not get_protocol(cloudpath):
     return "file://" + toabs(cloudpath)
@@ -44,7 +42,7 @@ def cli_main():
 @cli_main.command("init")
 @click.argument("source", required=True)
 @click.argument("destination", required=False)
-@click.option('--encoding', default='same', help="Destination encoding type. Options: same, png", show_default=True)
+@click.option('--encoding', default='same', help="Destination encoding type. Options: same, jpeg, jxl, png, bmp, tiff", show_default=True)
 @click.option('--compression', required=True, default='same', help="Destination compression type. Options: same, none, gzip, br, zstd", show_default=True)
 @click.option('--level', default=None, type=int, help="Encoding level for jpeg (0-100),jpegxl (0-100, 100=lossless),png (0-9).", show_default=True)
 @click.option('--jxl-effort', default=3, type=int, help="(jpegxl) Set effort for jpegxl encoding 1-10.", show_default=True)
