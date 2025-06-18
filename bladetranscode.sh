@@ -24,8 +24,6 @@ mkdir -p $DEST
 
 DBNAME=/home/voxa/transcode_dbs/transcode-$(date +%s).db
 
-NCPU=25
-
 cp $SOURCE/*.jpg $DEST/
 cp -r $SOURCE/metadata $DEST/
 cp -r $SOURCE/montage $DEST/
@@ -33,9 +31,8 @@ mkdir -p $DEST/subtiles/metadata/
 cp -r $SOURCE/subtiles/metadata/ $DEST/subtiles/
 
 echo "Database: $DBNAME"
-transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --level 100 --jxl-effort 3 --jxl-decoding-speed 0
-parallel -j $NCPU -N0 "transcode worker -b 1 --lease-msec 180000 $DBNAME" ::: $(seq $NCPU)
-# rm $DBNAME
+transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --level 100 --jxl-effort 2 --jxl-decoding-speed 0
+transcode worker --parallel 30 -b 2 --lease-msec 60000 --db-timeout 10000 --ramp-sec 0.25 $DBNAME --progress --cleanup
 
 bmp_files=$(find "$SOURCE/subtiles" -type f -name '*.bmp' -printf '%f\n' | sed 's/\.bmp$//' | sort)
 jxl_files=$(find "$DEST/subtiles" -type f -name '*.jxl' -printf '%f\n' | sed 's/\.jxl$//' | sort)
@@ -45,6 +42,7 @@ if [[ "$bmp_files" != "$jxl_files" ]]; then
     echo "$diff_result"
     exit 1
 fi
+
 
 get_file_size() {
     local file="$1"
@@ -60,17 +58,13 @@ get_file_size() {
 }
 
 for fname in $(ls $DEST/subtiles); do
-	fqpath="$DEST/subtiles/$fname"
-	size=$(get_file_size $fqpath)
-	if [[ $size -eq 0 && ! -d $fqpath ]]; then
-		echo "$fqpath was zero bytes. Maybe the copy operation failed?"
-		exit 1
-	fi
+    fqpath="$DEST/subtiles/$fname"
+    size=$(get_file_size $fqpath)
+    if [[ $size -eq 0 && ! -d $fqpath ]]; then
+        echo "$fqpath was zero bytes. Maybe the copy operation failed?"
+        exit 1
+    fi
 done;
 
+
 echo "done."
-
-
-
-
-
