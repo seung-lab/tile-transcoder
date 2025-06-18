@@ -60,7 +60,7 @@ get_file_size() {
 for fname in $(ls $DEST/subtiles); do
     fqpath="$DEST/subtiles/$fname"
     size=$(get_file_size $fqpath)
-    if [[ $size -eq 0 && ! -d $fqpath ]]; then
+    if [ "$size" -eq 0 ] && [ ! -d "$fqpath" ]; then
         echo "$fqpath was zero bytes. Maybe the copy operation failed?"
         exit 1
     fi
