@@ -137,7 +137,7 @@ def worker(
   
   rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
 
-  remaining = len(rt)
+  remaining = rt.rfs.remaining()
   total = rt.rfs.total()
   completed = total - remaining
 
@@ -149,7 +149,7 @@ def worker(
   )
 
   def update_pbar():
-    remaining = len(rt)
+    remaining = rt.rfs.remaining()
     completed = total - remaining
     pbar.n = completed
     pbar.refresh()
