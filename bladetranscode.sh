@@ -37,7 +37,7 @@ transcode worker --parallel 28 -b 2 --lease-msec 60000 --db-timeout 10000 --ramp
 bmp_files=$(find "$SOURCE/subtiles" -type f -name '*.bmp' -printf '%f\n' | sed 's/\.bmp$//' | sort)
 jxl_files=$(find "$DEST/subtiles" -type f -name '*.jxl' -printf '%f\n' | sed 's/\.jxl$//' | sort)
 
-if [[ "$bmp_files" != "$jxl_files" ]]; then
+if [ "$bmp_files" != "$jxl_files" ]; then
     echo "Error: Directory contents differ:"
     echo "$diff_result"
     exit 1
