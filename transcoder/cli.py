@@ -9,6 +9,7 @@ from cloudfiles import CloudFiles
 from cloudfiles.paths import get_protocol
 from cloudfiles.lib import toabs
 
+from .detectors import ResinHandling
 from .resumable import ResumableTransfer
 
 mp.set_start_method("spawn", force=True)
@@ -48,16 +49,16 @@ def cli_main():
 @click.option('--jxl-effort', default=3, type=int, help="(jpegxl) Set effort for jpegxl encoding 1-10.", show_default=True)
 @click.option('--jxl-decoding-speed', default=0, type=int, help="(jpegxl) Prioritize faster decoding 0-4 (0: default).", show_default=True)
 @click.option('--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
-@click.option('--ext', default=None, help="If present, filter files for this extension.")
+@click.option('--ext', default=None, help="If present, filter files for these comma separated extensions.")
 @click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
-@click.option('--discard-resin', default=False, is_flag=True, help="Uses a tissue detector tuned for TEM to check if a tile has tissue. If not, discard the tile by moving it to a discard folder.", show_default=True)
+@click.option('--resin', default="noop", help="Uses a tissue detector tuned for TEM to check if a tile has tissue. Possible actions: noop, move. move will put the tile into the source directory under a 'resin' folder.", show_default=True)
 def xferinit(
   source, destination, 
   encoding, compression, 
   db, level, 
   delete_original, ext,
   jxl_effort, jxl_decoding_speed,
-  discard_resin,
+  resin,
 ):
   """(1) Create db of files from the source."""
   if compression == "same":
@@ -87,7 +88,15 @@ def xferinit(
 
   paths = CloudFiles(source).list()
   if ext:
-    paths = ( p for p in paths if p.endswith(f'.{ext}') )
+    ext = ext.split(',')
+    paths = ( 
+      p for p in paths 
+      if any(p.endswith(f'.{e}') for e in ext)
+    )
+
+  resin_handling = ResinHandling.NOOP
+  if resin == "move":
+    resin_handling = ResinHandling.MOVE
 
   rt = ResumableTransfer(db)
   inserted = rt.init(
@@ -95,6 +104,7 @@ def xferinit(
     recompress=compression,
     reencode=encoding, 
     level=level, 
+    resin_handling=resin_handling,
     delete_original=delete_original,
     encoding_options=encoding_options,
   )

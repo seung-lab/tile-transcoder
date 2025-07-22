@@ -14,10 +14,10 @@ import sys
 from tqdm import tqdm
 
 import cloudfiles.compression
-from cloudfiles import CloudFiles
+from cloudfiles import CloudFiles, CloudFile
 from cloudfiles.lib import sip
 
-from .detectors import ResinHandling
+from .detectors import ResinHandling, tem_subtile_has_tissue
 from .content_types import content_type
 from .encoding import transcode_image
 
@@ -78,7 +78,7 @@ class ResumableFileSet:
     reencode:Optional[str] = None,
     level:Optional[int] = None,
     delete_original:bool = False,
-    resin_handling:int = False,
+    resin_handling:int = ResinHandling.NOOP,
     encoding_options:Dict[str,int] = {}
   ):
     cur = self.conn.cursor()
@@ -116,7 +116,7 @@ class ResumableFileSet:
       "reencode", 
       "encoding_level", 
       "encoding_options", 
-      "resin_handling", 
+      "resin_handling",
       "delete_original", 
       "created"
     ]
@@ -373,6 +373,7 @@ class ResumableTransfer:
     paths:Optional[str] = None, 
     recompress:Optional[str] = None, 
     reencode:Optional[str] = None, 
+    resin_handling:int = ResinHandling.NOOP,
     delete_original:bool = False, 
     level:Optional[int] = None,
     encoding_options:dict = {},
@@ -390,6 +391,7 @@ class ResumableTransfer:
       src, dest, 
       recompress, reencode,
       level=level,
+      resin_handling=resin_handling,
       delete_original=delete_original, 
       encoding_options=encoding_options,
     )
@@ -431,6 +433,24 @@ class ResumableTransfer:
       disable=(not progress)
     )
 
+    resin_move_path = cf_src.join(meta["source"], "../resin/")
+
+    def move_resin(path, img) -> bool:
+      if tem_subtile_has_tissue(img):
+        return True # continue transcoding
+
+      if verbose:
+        print(f"No tissue detected. Moving {path} to {resin_move_path}")
+
+      fullpath_src = cf_src.join(meta["source"], path)
+      fullpath_dest = cf_src.join(resin_move_path, path)
+      CloudFile(fullpath_src).move(fullpath_dest)
+      return False # stop transcoding
+
+    callback = None
+    if meta["resin_handling"] == ResinHandling.MOVE:
+      callback = move_resin
+
     with pbar:
       pbar.refresh()
       for paths in sip(self.rfs, block_size):
@@ -449,6 +469,7 @@ class ResumableTransfer:
               new_filename, new_binary = transcode_image(
                 filename, binary, 
                 meta["reencode"], meta["encoding_level"],
+                callback=callback,
                 **meta["encoding_options"]
               )
             except Exception as err:
