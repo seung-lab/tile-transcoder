@@ -72,7 +72,7 @@ def transcode_image(
       raise
 
     try:
-      ext, binary = encode(img, encoding, level, num_threads=num_threads, **kwargs)
+      ext, binary = encode(img, encoding, level, **kwargs)
     except:
       print(f"Encoding Error: {filename}", file=sys.stderr)
       raise
