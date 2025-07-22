@@ -366,6 +366,7 @@ class ResumableTransfer:
     progress:bool = False, 
     block_size:int = 200,
     verbose:bool = False,
+    codec_threads:int = 0,
   ):
     """
     Start working through tasks in the database.
@@ -374,10 +375,13 @@ class ResumableTransfer:
     block_size: how many items to download and process at once
     timeout: how long to wait for a sqlite lock to release
     verbose: print what the worker is doing
+    codec_threads: for codecs that are multithreaded, use this
+      number of threads. 0 = num cores
     """
     self.rfs.default_reservation = block_size
 
     meta = self.rfs.metadata()
+    meta["encoding_options"]["num_threads"] = int(codec_threads)
 
     cf_src = CloudFiles(meta["source"], progress=bool(verbose))
     cf_dest = CloudFiles(meta["dest"])

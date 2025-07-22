@@ -47,6 +47,7 @@ def cli_main():
 @click.option('--level', default=None, type=int, help="Encoding level for jpeg (0-100),jpegxl (0-100, 100=lossless),png (0-9).", show_default=True)
 @click.option('--jxl-effort', default=3, type=int, help="(jpegxl) Set effort for jpegxl encoding 1-10.", show_default=True)
 @click.option('--jxl-decoding-speed', default=0, type=int, help="(jpegxl) Prioritize faster decoding 0-4 (0: default).", show_default=True)
+@click.option('--num-threads', default=0, type=int, help="For codecs that support multiple threads, use this number of threads (0 = num cores). Supported codecs: jxl", show_default=True)
 @click.option('--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
 @click.option('--ext', default=None, help="If present, filter files for this extension.")
 @click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
@@ -56,6 +57,7 @@ def xferinit(
   db, level, 
   delete_original, ext,
   jxl_effort, jxl_decoding_speed,
+  num_threads
 ):
   """(1) Create db of files from the source."""
   if compression == "same":
@@ -75,6 +77,7 @@ def xferinit(
   if encoding == "jpegxl":
     encoding_options["effort"] = int(jxl_effort)
     encoding_options["decodingspeed"] = int(jxl_decoding_speed)
+    encoding_options["numthreads"] = int(num_threads)
 
   source = normalize_path(source)
 
@@ -97,9 +100,9 @@ def xferinit(
     encoding_options=encoding_options,
   )
 
-def _do_work(db, lease_msec, db_timeout, block_size, verbose):
+def _do_work(db, lease_msec, db_timeout, block_size, verbose, codec_threads):
   rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
-  rt.execute(progress=False, block_size=block_size, verbose=verbose)
+  rt.execute(progress=False, block_size=block_size, verbose=verbose, codec_threads=codec_threads)
 
 @cli_main.command("worker")
 @click.argument("db")
@@ -111,12 +114,13 @@ def _do_work(db, lease_msec, db_timeout, block_size, verbose):
 @click.option('--db-timeout', default=5.0, type=float, help="How many seconds to wait when the SQLite DB is locked. Use higher values under multi-process contention.", show_default=True)
 @click.option('--ramp-sec', default=0.0, type=float, help="How many seconds to wait between launching additional processes.", show_default=True)
 @click.option('--cleanup', is_flag=True, default=False, help="Delete the database when finished.")
+@click.option('--codec-threads', default=0, type=int, help="For codecs that support multiple threads, use this number of threads (0 = num cores). Supported codecs: jxl", show_default=True)
 def worker(
   db, progress, 
   lease_msec, block_size, 
   verbose, db_timeout, 
   cleanup, parallel,
-  ramp_sec,
+  ramp_sec, codec_threads,
 ):
   """(2) Perform the transfer using the database.
 
@@ -126,6 +130,7 @@ def worker(
   assert parallel > 0 and int(parallel) == parallel
   assert block_size > 0
   assert lease_msec >= 0
+  assert codec_threads >= 0
 
   if parallel > 1 and lease_msec == 0:
     print("Parallel workers require you to set lease_msec to avoid highly duplicated work.")
@@ -159,7 +164,7 @@ def worker(
   for _ in range(parallel):
     p = mp.Process(
       target=_do_work, 
-      args=(db, lease_msec, db_timeout, block_size, verbose)
+      args=(db, lease_msec, db_timeout, block_size, verbose, codec_threads)
     )
     p.start()
     if ramp_sec > 0:

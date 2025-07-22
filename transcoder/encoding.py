@@ -59,26 +59,28 @@ def transcode_image(
   if src_encoding == encoding:
     return binary
 
+  num_threads = kwargs.get("num_threads", None)
+
   elif src_encoding == "jpeg" and encoding in ["jpegxl", "jxl"] and level is None:
-    return (basename + ".jxl", jpegxl_encode_jpeg(binary))
+    return (basename + ".jxl", jpegxl_encode_jpeg(binary, numthreads=num_threads))
   elif src_encoding in ["jpegxl", "jxl"] and encoding == "jpeg" and level is None:
-    return (basename + ".jpeg", jpegxl_decode_jpeg(binary))
+    return (basename + ".jpeg", jpegxl_decode_jpeg(binary, numthreads=num_threads))
   else:
     try:
-      img = decode(binary, src_encoding)
+      img = decode(binary, src_encoding, num_threads=num_threads)
     except:
       print(f"Decoding Error: {filename}", file=sys.stderr)
       raise
 
     try:
-      ext, binary = encode(img, encoding, level, **kwargs)
+      ext, binary = encode(img, encoding, level, num_threads=num_threads, **kwargs)
     except:
       print(f"Encoding Error: {filename}", file=sys.stderr)
       raise
 
     return (basename + ext, binary)
 
-def decode(binary:bytes, encoding:str) -> np.ndarray:
+def decode(binary:bytes, encoding:str, num_threads:Optional[int] = None) -> np.ndarray:
 
   check_installed(encoding)
 
@@ -89,7 +91,7 @@ def decode(binary:bytes, encoding:str) -> np.ndarray:
   elif encoding == "jpeg":
     return simplejpeg.decode_jpeg(binary)
   elif encoding in ["jpegxl", "jxl"]:
-    return imagecodecs.jpegxl_decode(binary)
+    return imagecodecs.jpegxl_decode(binary, numthreads=num_threads)
   elif encoding in ["tiff", "tif"]:
     return tiff_to_npy(binary)
   else:
@@ -98,7 +100,8 @@ def decode(binary:bytes, encoding:str) -> np.ndarray:
 def encode(
   img:np.ndarray, 
   encoding:str, 
-  level:Optional[int],
+  level:Optional[int] = None,
+  num_threads:Optional[int] = None,
   **kwargs,
 ) -> Tuple[str, bytes]:
 
@@ -115,6 +118,7 @@ def encode(
       img, level, 
       effort=int(kwargs.get("effort", 3)),
       decodingspeed=int(kwargs.get("decodingspeed", 0)),
+      numthreads=num_threads,
     ))
   elif encoding in ["tiff", "tif"]:
     return npy_to_tiff(img)
@@ -141,7 +145,7 @@ def npy_to_tiff(img:np.ndarray) -> bytes:
   buf.seek(0)
   return buf.read()
 
-def encode_jpegxl(arr, level, effort, decodingspeed):
+def encode_jpegxl(arr, level, effort, decodingspeed, numthreads):
   if not np.issubdtype(arr.dtype, np.uint8):
     raise ValueError(f"Only accepts uint8 arrays. Got: {arr.dtype}")
 
@@ -167,6 +171,7 @@ def encode_jpegxl(arr, level, effort, decodingspeed):
     lossless=lossless,
     effort=effort,
     decodingspeed=decodingspeed,
+    numthreads=numthreads,
   )
 
 def encode_jpeg(arr, quality):
