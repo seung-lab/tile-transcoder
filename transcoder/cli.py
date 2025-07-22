@@ -91,7 +91,7 @@ def xferinit(
     paths = ( p for p in paths if p.endswith(f'.{ext}') )
 
   rt = ResumableTransfer(db)
-  rt.init(
+  inserted = rt.init(
     source, destination, paths,
     recompress=compression,
     reencode=encoding, 
@@ -99,6 +99,9 @@ def xferinit(
     delete_original=delete_original,
     encoding_options=encoding_options,
   )
+
+  if inserted == 0:
+    print("WARNING: No files inserted into the database. Is your filter extension correct?")
 
 def _do_work(db, lease_msec, db_timeout, block_size, verbose, codec_threads):
   rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)

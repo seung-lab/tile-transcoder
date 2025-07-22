@@ -165,19 +165,24 @@ class ResumableFileSet:
     )
     cur.close()
 
-  def insert(self, fname_iter):
+  def insert(self, fname_iter) -> int:
     cur = self.conn.cursor()
 
     # cur.execute("PRAGMA journal_mode = MEMORY")
     # cur.execute("PRAGMA synchronous = OFF")
 
+    count = 0
+
     for filenames in sip(fname_iter, SQLITE_MAX_PARAMS):
+      count += len(filenames)
       bindlist = ",".join([f"({BIND},0,0)"] * len(filenames))
       cur.execute(f"INSERT INTO filelist(filename,finished,lease) VALUES {bindlist}", filenames)
       cur.execute("commit")
 
     cur.close()
     self._total_dirty = True
+
+    return count
 
   def metadata(self):
     cur = self.conn.cursor()
@@ -342,7 +347,7 @@ class ResumableTransfer:
     delete_original:bool = False, 
     level:Optional[int] = None,
     encoding_options:dict = {},
-  ):
+  ) -> int:
     if isinstance(paths, str):
       paths = CloudFiles(paths).list()
     elif isinstance(paths, CloudFiles):
@@ -359,7 +364,7 @@ class ResumableTransfer:
       delete_original=delete_original, 
       encoding_options=encoding_options,
     )
-    self.rfs.insert(paths)
+    return self.rfs.insert(paths)
 
   def execute(
     self, 
