@@ -47,7 +47,6 @@ def cli_main():
 @click.option('--level', default=None, type=int, help="Encoding level for jpeg (0-100),jpegxl (0-100, 100=lossless),png (0-9).", show_default=True)
 @click.option('--jxl-effort', default=3, type=int, help="(jpegxl) Set effort for jpegxl encoding 1-10.", show_default=True)
 @click.option('--jxl-decoding-speed', default=0, type=int, help="(jpegxl) Prioritize faster decoding 0-4 (0: default).", show_default=True)
-@click.option('--num-threads', default=0, type=int, help="For codecs that support multiple threads, use this number of threads (0 = num cores). Supported codecs: jxl", show_default=True)
 @click.option('--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
 @click.option('--ext', default=None, help="If present, filter files for this extension.")
 @click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
@@ -57,7 +56,6 @@ def xferinit(
   db, level, 
   delete_original, ext,
   jxl_effort, jxl_decoding_speed,
-  num_threads
 ):
   """(1) Create db of files from the source."""
   if compression == "same":
@@ -77,7 +75,6 @@ def xferinit(
   if encoding == "jpegxl":
     encoding_options["effort"] = int(jxl_effort)
     encoding_options["decodingspeed"] = int(jxl_decoding_speed)
-    encoding_options["numthreads"] = int(num_threads)
 
   source = normalize_path(source)
 
