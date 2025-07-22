@@ -56,11 +56,10 @@ def transcode_image(
   src_encoding = src_encoding.lower()
   encoding = encoding.lower()
 
-  if src_encoding == encoding:
-    return binary
-
   num_threads = kwargs.get("num_threads", None)
 
+  if src_encoding == encoding:
+    return binary
   elif src_encoding == "jpeg" and encoding in ["jpegxl", "jxl"] and level is None:
     return (basename + ".jxl", jpegxl_encode_jpeg(binary, numthreads=num_threads))
   elif src_encoding in ["jpegxl", "jxl"] and encoding == "jpeg" and level is None:
