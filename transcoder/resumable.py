@@ -20,9 +20,7 @@ from cloudfiles.lib import sip
 from .detectors import ResinHandling, tem_subtile_has_tissue
 from .content_types import content_type
 from .encoding import transcode_image
-
-class EncodingNotSupported(Exception):
-  pass
+from .exceptions import SkipTranscoding
 
 # the maximum value of a host parameter number is 
 # SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999 
@@ -437,7 +435,7 @@ class ResumableTransfer:
 
     def move_resin(path, img) -> bool:
       if tem_subtile_has_tissue(img):
-        return True # continue transcoding
+        return
 
       if verbose:
         print(f"No tissue detected. Moving {path} to {resin_move_path}")
@@ -445,7 +443,7 @@ class ResumableTransfer:
       fullpath_src = cf_src.join(meta["source"], path)
       fullpath_dest = cf_src.join(resin_move_path, path)
       CloudFile(fullpath_src).move(fullpath_dest)
-      return False # stop transcoding
+      raise SkipTranscoding()
 
     callback = None
     if meta["resin_handling"] == ResinHandling.MOVE:
@@ -472,6 +470,8 @@ class ResumableTransfer:
                 callback=callback,
                 **meta["encoding_options"]
               )
+            except SkipTranscoding:
+              continue
             except Exception as err:
               if verbose:
                 print(f"{filename} error: {err}")

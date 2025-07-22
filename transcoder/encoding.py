@@ -44,8 +44,7 @@ def check_installed(encoding):
   if encoding in NEEDS_INSTALL:
     raise ImportError(f"Optional codec {encoding} is not installed. Run: pip install {NEEDS_INSTALL[encoding]}")
 
-class EncodingNotSupported(Exception):
-  pass
+from .exceptions import EncodingNotSupported
 
 def transcode_image(
   filename:str, 
@@ -93,8 +92,7 @@ def transcode_image(
       print(f"Decoding Error: {filename}", file=sys.stderr)
       raise
 
-    if not callback(filename, decoded_image):
-      return (filename, binary)
+    callback(filename, decoded_image)
 
   if src_encoding == encoding:
     return (filename, binary)
