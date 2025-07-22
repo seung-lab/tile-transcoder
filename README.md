@@ -9,24 +9,16 @@ Currently supports: `.bmp`, `.png`, `.jpeg`, `.jxl`, `.tiff`
 
 # Listing 1: Create Database
 
-```python
-from transcoder import ResumableTransfer
-
-rt = ResumableTransfer("xfer.db") # creates sqlite db
-
-source = "file://...." # a cloudfiles cloudpath
-dest = "gs://...." # a cloudfiles cloudpath, can be same as source
-
-# populates the database with the transfer
-rt.init(source, dest, paths, recompress=compression, reencode=encoding, encoding_level=85, delete_original=False)
+```bash
+transcode init $SRC $DEST --level 100 --encoding jxl --jxl-effort 2 --db xfer.db
 ```
 
 # Listing 2: Run Workers
 
-Run one worker per a process, e.g. in SLURM.
+Run two workers per a process, e.g. in SLURM.
 
 ```bash
-transcode worker xfer.db --progress --lease-msec 60000 --block-size 20
+transcode worker xfer.db --parallel 2 --progress --lease-msec 60000 --block-size 20
 ```
 
 
