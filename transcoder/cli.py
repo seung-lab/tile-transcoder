@@ -50,12 +50,14 @@ def cli_main():
 @click.option('--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
 @click.option('--ext', default=None, help="If present, filter files for this extension.")
 @click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
+@click.option('--discard-resin', default=False, is_flag=True, help="Uses a tissue detector tuned for TEM to check if a tile has tissue. If not, discard the tile by moving it to a discard folder.", show_default=True)
 def xferinit(
   source, destination, 
   encoding, compression, 
   db, level, 
   delete_original, ext,
   jxl_effort, jxl_decoding_speed,
+  discard_resin,
 ):
   """(1) Create db of files from the source."""
   if compression == "same":
