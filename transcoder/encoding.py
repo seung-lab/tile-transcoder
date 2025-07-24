@@ -12,6 +12,10 @@ import sys
 import numpy as np
 import numpy.typing as npt
 
+SUPPORTED_ENCODINGS = [
+  "tiff", "bmp", "png", "jpeg", "jpegxl"
+]
+
 NEEDS_INSTALL = {}
 
 try:
@@ -212,19 +216,6 @@ def encode_jpegxl(arr, level, effort, decodingspeed, numthreads):
     numthreads=numthreads,
   )
 
-def as2d(arr):
-  # simulate multi-channel array for single channel arrays
-  while arr.ndim < 4:
-    arr = arr[..., np.newaxis] # add channels to end of x,y,z
-
-  num_channel = arr.shape[3]
-  reshaped = arr.T
-  reshaped = np.moveaxis(reshaped, 0, -1)
-  reshaped = reshaped.reshape(
-    reshaped.shape[0] * reshaped.shape[1], reshaped.shape[2], num_channel
-  )
-  return reshaped, num_channel
-
 def encode_jpeg(arr, quality):
   if not np.issubdtype(arr.dtype, np.uint8):
     raise ValueError(f"Only accepts uint8 arrays. Got: {arr.dtype}")
@@ -232,7 +223,12 @@ def encode_jpeg(arr, quality):
   if quality is None:
     quality = 85
 
-  arr, num_channel = as2d(arr)
+  if arr.ndim == 2:
+    num_channel = 1
+    arr = arr[..., np.newaxis]
+  else:
+    num_channel = arr.shape[2]
+
   arr = np.ascontiguousarray(arr)
 
   if num_channel == 1:

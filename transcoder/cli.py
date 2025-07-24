@@ -9,6 +9,7 @@ from cloudfiles import CloudFiles
 from cloudfiles.paths import get_protocol
 from cloudfiles.lib import toabs
 
+from .encoding import SUPPORTED_ENCODINGS
 from .detectors import ResinHandling
 from .resumable import ResumableTransfer
 
@@ -72,6 +73,12 @@ def xferinit(
     encoding = None
   elif encoding == "jxl":
     encoding = "jpegxl"
+  elif encoding == "jpg":
+    encoding = "jpeg"
+
+  if encoding not in SUPPORTED_ENCODINGS:
+    print(f"{encoding} is not a supported encoding.")
+    return
 
   encoding_options = {}
 
