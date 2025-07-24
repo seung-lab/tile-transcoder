@@ -52,7 +52,7 @@ def cli_main():
 @click.option('--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
 @click.option('--ext', default=None, help="If present, filter files for these comma separated extensions.")
 @click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
-@click.option('--resin', default="noop", help="Uses a tissue detector tuned for TEM to check if a tile has tissue. Possible actions: noop, log, move. move will put the tile into the source directory under a 'resin' folder.", show_default=True)
+@click.option('--resin', default="noop", help="Uses a tissue detector tuned for TEM to check if a tile has tissue. Possible actions: noop, log, move, stay. move: put tile in the source directory under 'resin'. stay: log + skip copying the tile.", show_default=True)
 def xferinit(
   source, destination, 
   encoding, compression, 
@@ -106,6 +106,8 @@ def xferinit(
     resin_handling = ResinHandling.MOVE
   elif resin == "log":
     resin_handling = ResinHandling.LOG
+  elif resin == "stay":
+    resin_handling = ResinHandling.STAY
 
   rt = ResumableTransfer(db)
   inserted = rt.init(
