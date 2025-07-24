@@ -68,7 +68,7 @@ def tem_subtile_has_tissue(img:npt.NDArray[np.uint8]) -> bool:
 def make_resin_action(source:str, verbose:bool, resin_handling:int) -> Optional[Callable[[str, npt.NDArray[np.uint8]], None]]:
   cf_src = CloudFiles(source)
 
-  resin_move_path = cf_src.join(source, "../resin/")
+  resin_move_path = cf_src.join(os.path.dirname(source), "resin/")
   logfile = LOGFILE.format(pid=os.getpid())
 
   if resin_handling in (ResinHandling.LOG, ResinHandling.STAY):
