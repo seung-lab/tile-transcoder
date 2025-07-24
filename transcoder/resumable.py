@@ -17,7 +17,7 @@ import cloudfiles.compression
 from cloudfiles import CloudFiles, CloudFile
 from cloudfiles.lib import sip
 
-from .detectors import ResinHandling, tem_subtile_has_tissue
+from .detectors import ResinHandling, make_resin_action
 from .content_types import content_type
 from .encoding import transcode_image
 from .exceptions import SkipTranscoding
@@ -431,32 +431,7 @@ class ResumableTransfer:
       disable=(not progress)
     )
 
-    resin_move_path = cf_src.join(meta["source"], "../resin/")
-
-    def move_resin(path, img):
-      if tem_subtile_has_tissue(img):
-        return
-
-      if verbose:
-        print(f"No tissue detected. Moving {path} to {resin_move_path}")
-
-      fullpath_src = cf_src.join(meta["source"], path)
-      fullpath_dest = cf_src.join(resin_move_path, path)
-      CloudFile(fullpath_src).move(fullpath_dest)
-      raise SkipTranscoding()
-
-    def log_resin(path, img):
-      if tem_subtile_has_tissue(img):
-        return
-
-      if verbose:
-        print(f"No tissue detected in {path}.")
-
-    callback = None
-    if meta["resin_handling"] == ResinHandling.MOVE:
-      callback = move_resin
-    elif meta["resin_handling"] == ResinHandling.LOG:
-      callback = log_resin
+    resin_callback = make_resin_action(meta["source"], verbose, meta["resin_handling"])
 
     with pbar:
       pbar.refresh()
@@ -476,7 +451,7 @@ class ResumableTransfer:
               new_filename, new_binary = transcode_image(
                 filename, binary, 
                 meta["reencode"], meta["encoding_level"],
-                callback=callback,
+                callback=resin_callback,
                 **meta["encoding_options"]
               )
             except SkipTranscoding:
