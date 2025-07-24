@@ -433,7 +433,7 @@ class ResumableTransfer:
 
     resin_move_path = cf_src.join(meta["source"], "../resin/")
 
-    def move_resin(path, img) -> bool:
+    def move_resin(path, img):
       if tem_subtile_has_tissue(img):
         return
 
@@ -445,9 +445,18 @@ class ResumableTransfer:
       CloudFile(fullpath_src).move(fullpath_dest)
       raise SkipTranscoding()
 
+    def log_resin(path, img):
+      if tem_subtile_has_tissue(img):
+        return
+
+      if verbose:
+        print(f"No tissue detected in {path}.")
+
     callback = None
     if meta["resin_handling"] == ResinHandling.MOVE:
       callback = move_resin
+    elif meta["resin_handling"] == ResinHandling.LOG:
+      callback = log_resin
 
     with pbar:
       pbar.refresh()
