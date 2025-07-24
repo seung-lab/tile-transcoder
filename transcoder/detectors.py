@@ -1,5 +1,7 @@
 from typing import Callable, Optional
+from datetime import datetime
 import enum
+import os
 
 import numpy as np
 import numpy.typing as npt
@@ -27,6 +29,8 @@ class ResinHandling(enum.IntEnum):
   LOSSY = 3
   LOG = 4
   STAY = 5
+
+LOGFILE = "transcoder.resin.{pid}.log"
 
 def tem_subtile_has_tissue(img:npt.NDArray[np.uint8]) -> bool:
   """
@@ -61,11 +65,18 @@ def tem_subtile_has_tissue(img:npt.NDArray[np.uint8]) -> bool:
 
   return np.any(edges)
 
-
 def make_resin_action(source:str, verbose:bool, resin_handling:int) -> Optional[Callable[[str, npt.NDArray[np.uint8]], None]]:
   cf_src = CloudFiles(source)
 
   resin_move_path = cf_src.join(source, "../resin/")
+  logfile = LOGFILE.format(pid=os.getpid())
+
+  if resin_handling in (ResinHandling.LOG, ResinHandling.STAY):
+    with open(logfile, "at") as f:
+      f.write(f"# LOGTYPE: RESIN\n")
+      f.write(f"# DESCRIPTION: The following files did not appear to contain tissue.\n")
+      f.write(f"# SOURCE: {source}\n")
+      f.write(f"# DATE: {datetime.now().isoformat()}\n")
 
   def move_resin(path, img):
     if tem_subtile_has_tissue(img):
@@ -85,6 +96,9 @@ def make_resin_action(source:str, verbose:bool, resin_handling:int) -> Optional[
 
     if verbose:
       print(f"No tissue detected in {path}.")
+
+    with open(logfile, "at") as f:
+      f.write(path + "\n")
 
     return False
 
