@@ -26,6 +26,7 @@ class ResinHandling(enum.IntEnum):
   DELETE = 2
   LOSSY = 3
   LOG = 4
+  STAY = 5
 
 def tem_subtile_has_tissue(img:npt.NDArray[np.uint8]) -> bool:
   """
@@ -76,7 +77,7 @@ def make_resin_action(source:str, verbose:bool, resin_handling:int) -> Optional[
     fullpath_src = cf_src.join(source, path)
     fullpath_dest = cf_src.join(resin_move_path, path)
     CloudFile(fullpath_src).move(fullpath_dest)
-    raise SkipTranscoding()
+    raise SkipTranscoding()    
 
   def log_resin(path, img):
     if tem_subtile_has_tissue(img):
@@ -85,10 +86,16 @@ def make_resin_action(source:str, verbose:bool, resin_handling:int) -> Optional[
     if verbose:
       print(f"No tissue detected in {path}.")
 
+  def stay_resin(path, img):
+    log_resin(path, img)
+    raise SkipTranscoding()
+
   if resin_handling == ResinHandling.MOVE:
     return move_resin
   elif resin_handling == ResinHandling.LOG:
     return log_resin
+  elif resin_handling == ResinHandling.STAY:
+    return stay_resin
 
   return None
 
