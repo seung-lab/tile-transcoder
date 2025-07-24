@@ -112,9 +112,9 @@ def xferinit(
   if inserted == 0:
     print("WARNING: No files inserted into the database. Is your filter extension correct?")
 
-def _do_work(db, lease_msec, db_timeout, block_size, verbose, codec_threads):
+def _do_work(db, progress, lease_msec, db_timeout, block_size, verbose, codec_threads):
   rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
-  rt.execute(progress=False, block_size=block_size, verbose=verbose, codec_threads=codec_threads)
+  rt.execute(progress=progress, block_size=block_size, verbose=verbose, codec_threads=codec_threads)
 
 @cli_main.command("worker")
 @click.argument("db")
@@ -143,6 +143,10 @@ def worker(
   assert block_size > 0
   assert lease_msec >= 0
   assert codec_threads >= 0
+
+  if parallel == 1:
+    _do_work(db, progress, lease_msec, db_timeout, block_size, verbose, codec_threads)
+    return
 
   if parallel > 1 and lease_msec == 0:
     print("Parallel workers require you to set lease_msec to avoid highly duplicated work.")
@@ -176,7 +180,7 @@ def worker(
   for _ in range(parallel):
     p = mp.Process(
       target=_do_work, 
-      args=(db, lease_msec, db_timeout, block_size, verbose, codec_threads)
+      args=(db, False, lease_msec, db_timeout, block_size, verbose, codec_threads)
     )
     p.start()
     if ramp_sec > 0:
