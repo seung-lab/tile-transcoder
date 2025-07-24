@@ -79,16 +79,18 @@ def make_resin_action(source:str, verbose:bool, resin_handling:int) -> Optional[
     CloudFile(fullpath_src).move(fullpath_dest)
     raise SkipTranscoding()    
 
-  def log_resin(path, img):
+  def log_resin(path, img) -> bool:
     if tem_subtile_has_tissue(img):
-      return
+      return True
 
     if verbose:
       print(f"No tissue detected in {path}.")
 
+    return False
+
   def stay_resin(path, img):
-    log_resin(path, img)
-    raise SkipTranscoding()
+    if not log_resin(path, img):
+      raise SkipTranscoding()
 
   if resin_handling == ResinHandling.MOVE:
     return move_resin
