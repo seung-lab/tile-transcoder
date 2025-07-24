@@ -7,6 +7,7 @@ import numpy as np
 import numpy.typing as npt
 
 from cloudfiles import CloudFiles, CloudFile
+from cloudfiles.lib import mkdir
 from .exceptions import SkipTranscoding
 
 try:
@@ -68,8 +69,12 @@ def tem_subtile_has_tissue(img:npt.NDArray[np.uint8]) -> bool:
 def make_resin_action(source:str, verbose:bool, resin_handling:int) -> Optional[Callable[[str, npt.NDArray[np.uint8]], None]]:
   cf_src = CloudFiles(source)
 
-  resin_move_path = cf_src.join(os.path.dirname(source), "resin/")
-  logfile = LOGFILE.format(pid=os.getpid())
+  src_parent = os.path.dirname(source)
+
+  resin_move_path = cf_src.join(src_parent, "resin/")
+  logdir = cf_src.join(src_parent, "logs").replace("file://", "")
+  mkdir(logdir)
+  logfile = cf_src.join(logdir, LOGFILE.format(pid=os.getpid()))
 
   if resin_handling in (ResinHandling.LOG, ResinHandling.STAY):
     with open(logfile, "at") as f:
