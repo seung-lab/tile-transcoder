@@ -144,16 +144,16 @@ def worker(
   assert lease_msec >= 0
   assert codec_threads >= 0
 
+  if not os.path.exists(db):
+    print(f"Database {db} does not exist. Did you call transcode init?")
+    return
+
   if parallel == 1:
     _do_work(db, progress, lease_msec, db_timeout, block_size, verbose, codec_threads)
     return
 
   if parallel > 1 and lease_msec == 0:
     print("Parallel workers require you to set lease_msec to avoid highly duplicated work.")
-    return
-
-  if not os.path.exists(db):
-    print(f"Database {db} does not exist. Did you call transcode init?")
     return
   
   rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
