@@ -9,6 +9,8 @@ from cloudfiles import CloudFiles
 from cloudfiles.paths import get_protocol
 from cloudfiles.lib import toabs
 
+from .encoding import SUPPORTED_ENCODINGS
+from .detectors import ResinHandling
 from .resumable import ResumableTransfer
 
 mp.set_start_method("spawn", force=True)
@@ -48,14 +50,16 @@ def cli_main():
 @click.option('--jxl-effort', default=3, type=int, help="(jpegxl) Set effort for jpegxl encoding 1-10.", show_default=True)
 @click.option('--jxl-decoding-speed', default=0, type=int, help="(jpegxl) Prioritize faster decoding 0-4 (0: default).", show_default=True)
 @click.option('--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
-@click.option('--ext', default=None, help="If present, filter files for this extension.")
+@click.option('--ext', default=None, help="If present, filter files for these comma separated extensions.")
 @click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
+@click.option('--resin', default="noop", help="Uses a tissue detector tuned for TEM to check if a tile has tissue. Possible actions: noop, log, move, stay. move: put tile in the source directory under 'resin'. stay: log + skip copying the tile.", show_default=True)
 def xferinit(
   source, destination, 
   encoding, compression, 
   db, level, 
   delete_original, ext,
   jxl_effort, jxl_decoding_speed,
+  resin,
 ):
   """(1) Create db of files from the source."""
   if compression == "same":
@@ -69,6 +73,12 @@ def xferinit(
     encoding = None
   elif encoding == "jxl":
     encoding = "jpegxl"
+  elif encoding == "jpg":
+    encoding = "jpeg"
+
+  if encoding not in SUPPORTED_ENCODINGS:
+    print(f"{encoding} is not a supported encoding.")
+    return
 
   encoding_options = {}
 
@@ -85,7 +95,19 @@ def xferinit(
 
   paths = CloudFiles(source).list()
   if ext:
-    paths = ( p for p in paths if p.endswith(f'.{ext}') )
+    ext = ext.split(',')
+    paths = ( 
+      p for p in paths 
+      if any(p.endswith(f'.{e}') for e in ext)
+    )
+
+  resin_handling = ResinHandling.NOOP
+  if resin == "move":
+    resin_handling = ResinHandling.MOVE
+  elif resin == "log":
+    resin_handling = ResinHandling.LOG
+  elif resin == "stay":
+    resin_handling = ResinHandling.STAY
 
   rt = ResumableTransfer(db)
   inserted = rt.init(
@@ -93,6 +115,7 @@ def xferinit(
     recompress=compression,
     reencode=encoding, 
     level=level, 
+    resin_handling=resin_handling,
     delete_original=delete_original,
     encoding_options=encoding_options,
   )
@@ -100,9 +123,9 @@ def xferinit(
   if inserted == 0:
     print("WARNING: No files inserted into the database. Is your filter extension correct?")
 
-def _do_work(db, lease_msec, db_timeout, block_size, verbose, codec_threads):
+def _do_work(db, progress, lease_msec, db_timeout, block_size, verbose, codec_threads):
   rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
-  rt.execute(progress=False, block_size=block_size, verbose=verbose, codec_threads=codec_threads)
+  rt.execute(progress=progress, block_size=block_size, verbose=verbose, codec_threads=codec_threads)
 
 @cli_main.command("worker")
 @click.argument("db")
@@ -112,7 +135,7 @@ def _do_work(db, lease_msec, db_timeout, block_size, verbose, codec_threads):
 @click.option('-b', '--block-size', default=200, help="Number of files to process at a time.", show_default=True)
 @click.option('--verbose', is_flag=True, default=False, help="Print more about what the worker is doing.", show_default=True)
 @click.option('--db-timeout', default=5.0, type=float, help="How many seconds to wait when the SQLite DB is locked. Use higher values under multi-process contention.", show_default=True)
-@click.option('--ramp-sec', default=0.0, type=float, help="How many seconds to wait between launching additional processes.", show_default=True)
+@click.option('--ramp-sec', default=0.25, type=float, help="How many seconds to wait between launching additional processes.", show_default=True)
 @click.option('--cleanup', is_flag=True, default=False, help="Delete the database when finished.")
 @click.option('--codec-threads', default=0, type=int, help="For codecs that support multiple threads, use this number of threads (0 = num cores). Supported codecs: jxl", show_default=True)
 def worker(
@@ -132,12 +155,16 @@ def worker(
   assert lease_msec >= 0
   assert codec_threads >= 0
 
-  if parallel > 1 and lease_msec == 0:
-    print("Parallel workers require you to set lease_msec to avoid highly duplicated work.")
-    return
-
   if not os.path.exists(db):
     print(f"Database {db} does not exist. Did you call transcode init?")
+    return
+
+  if parallel == 1:
+    _do_work(db, progress, lease_msec, db_timeout, block_size, verbose, codec_threads)
+    return
+
+  if parallel > 1 and lease_msec == 0:
+    print("Parallel workers require you to set lease_msec to avoid highly duplicated work.")
     return
   
   rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
@@ -164,7 +191,7 @@ def worker(
   for _ in range(parallel):
     p = mp.Process(
       target=_do_work, 
-      args=(db, lease_msec, db_timeout, block_size, verbose, codec_threads)
+      args=(db, False, lease_msec, db_timeout, block_size, verbose, codec_threads)
     )
     p.start()
     if ramp_sec > 0:

@@ -14,14 +14,13 @@ import sys
 from tqdm import tqdm
 
 import cloudfiles.compression
-from cloudfiles import CloudFiles
+from cloudfiles import CloudFiles, CloudFile
 from cloudfiles.lib import sip
 
+from .detectors import ResinHandling, make_resin_action
 from .content_types import content_type
 from .encoding import transcode_image
-
-class EncodingNotSupported(Exception):
-  pass
+from .exceptions import SkipTranscoding
 
 # the maximum value of a host parameter number is 
 # SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999 
@@ -77,6 +76,7 @@ class ResumableFileSet:
     reencode:Optional[str] = None,
     level:Optional[int] = None,
     delete_original:bool = False,
+    resin_handling:int = ResinHandling.NOOP,
     encoding_options:Dict[str,int] = {}
   ):
     cur = self.conn.cursor()
@@ -95,6 +95,7 @@ class ResumableFileSet:
         reencode TEXT NULL,
         encoding_level {INTEGER} NULL,
         encoding_options TEXT NULL,
+        resin_handling {INTEGER} DEFAULT {int(ResinHandling.NOOP)},
         delete_original BOOLEAN DEFAULT FALSE,
         created {INTEGER} NOT NULL
       )
@@ -105,11 +106,29 @@ class ResumableFileSet:
       for k,v in encoding_options.items()
     ])
 
+    fields = [
+      "id", 
+      "source", 
+      "dest", 
+      "recompress", 
+      "reencode", 
+      "encoding_level", 
+      "encoding_options", 
+      "resin_handling",
+      "delete_original", 
+      "created"
+    ]
+
     cur.execute(
-      """INSERT INTO xfermeta 
-      (id, source, dest, recompress, reencode, encoding_level, encoding_options, delete_original, created) 
-      VALUES (?,?,?,?,?,?,?,?,?)""", 
-      [ 1, src, dest, recompress, reencode, level, encoding_options_serialized, delete_original, now_msec() ]
+      f"""INSERT INTO xfermeta 
+      ({",".join(fields)}) 
+      VALUES ({",".join(["?"] * len(fields))})""", 
+      [ 
+        1, src, dest, 
+        recompress, reencode, level, 
+        encoding_options_serialized, int(resin_handling), delete_original, 
+        now_msec()
+      ]
     )
 
     cur.execute(f"""
@@ -186,26 +205,34 @@ class ResumableFileSet:
 
   def metadata(self):
     cur = self.conn.cursor()
-    cur.execute("""
+
+    fields = [
+        "source",
+        "dest",
+        "recompress",
+        "reencode", 
+        "encoding_level",
+        "encoding_options",
+        "resin_handling",
+        "delete_original",
+        "created"
+    ]
+
+    cur.execute(f"""
       SELECT 
-        source, dest, recompress, reencode, 
-        encoding_level, encoding_options,
-        delete_original, created 
+        {",".join(fields)}
       FROM xfermeta 
       LIMIT 1
     """)
     row = cur.fetchone()
 
     meta = {
-      "source": row[0],
-      "dest": row[1],
-      "recompress": row[2],
-      "reencode": row[3],
-      "encoding_level": row[4],
-      "encoding_options": row[5],
-      "delete_original": row[6],
-      "created": row[7],
+      field: row[i]
+      for i, field in enumerate(fields)
     }
+
+    meta["resin_handling"] = int(meta["resin_handling"])
+    meta["delete_original"] = bool(meta["delete_original"])
 
     if not meta["recompress"] or meta["recompress"] == '0':
       meta["recompress"] = None
@@ -344,6 +371,7 @@ class ResumableTransfer:
     paths:Optional[str] = None, 
     recompress:Optional[str] = None, 
     reencode:Optional[str] = None, 
+    resin_handling:int = ResinHandling.NOOP,
     delete_original:bool = False, 
     level:Optional[int] = None,
     encoding_options:dict = {},
@@ -361,6 +389,7 @@ class ResumableTransfer:
       src, dest, 
       recompress, reencode,
       level=level,
+      resin_handling=resin_handling,
       delete_original=delete_original, 
       encoding_options=encoding_options,
     )
@@ -402,6 +431,8 @@ class ResumableTransfer:
       disable=(not progress)
     )
 
+    resin_callback = make_resin_action(meta["source"], verbose, meta["resin_handling"])
+
     with pbar:
       pbar.refresh()
       for paths in sip(self.rfs, block_size):
@@ -420,8 +451,11 @@ class ResumableTransfer:
               new_filename, new_binary = transcode_image(
                 filename, binary, 
                 meta["reencode"], meta["encoding_level"],
+                callback=resin_callback,
                 **meta["encoding_options"]
               )
+            except SkipTranscoding:
+              continue
             except Exception as err:
               if verbose:
                 print(f"{filename} error: {err}")

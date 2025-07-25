@@ -10,6 +10,11 @@ import os
 import sys
 
 import numpy as np
+import numpy.typing as npt
+
+SUPPORTED_ENCODINGS = [
+  "tiff", "bmp", "png", "jpeg", "jpegxl"
+]
 
 NEEDS_INSTALL = {}
 
@@ -43,13 +48,38 @@ def check_installed(encoding):
   if encoding in NEEDS_INSTALL:
     raise ImportError(f"Optional codec {encoding} is not installed. Run: pip install {NEEDS_INSTALL[encoding]}")
 
+from .exceptions import EncodingNotSupported
+
 def transcode_image(
   filename:str, 
   binary:bytes, 
   encoding:str, 
   level:Optional[int],
+  callback:Optional[Callable[[npt.NDArray[np.uint8]], bool]] = None,
   **kwargs,
-) -> bytes:
+) -> tuple[str, bytes]:
+  """
+  Transcodes a given image to a new image type
+  as efficiently as possible.
+
+  Under some circumstances, such as matching source and destination
+  encoding or jpeg<->jxl, we can avoid decoding the image.
+
+  filename: file path with the current file extension (e.g. image.png)
+    the file extension is how it knows the source encoding.
+  binary: the encoded file as byte string
+  encoding: the destination encoding (e.g. png, jxl, etc)
+  level: quality level
+  callback: 
+    If provided, forces decoding of the image and passes it to
+    this as callable(path, img). The bool return type tells whether
+    to continue with the transcoding process. For example,
+    a given callable might move a file instead of transcoding it
+    based on a computer vision result and return False meaning,
+    don't continue wasting time with encoding.
+
+  Returns (filename + ext, transcoded binary)
+  """
   basename, ext = os.path.splitext(filename)
 
   src_encoding = ext[1:] # eliminate '.'
@@ -58,18 +88,31 @@ def transcode_image(
 
   num_threads = kwargs.get("num_threads", None)
 
+  decoded_image = None 
+  if callback:
+    try:
+      decoded_image = decode(binary, src_encoding, num_threads=num_threads)
+    except:
+      print(f"Decoding Error: {filename}", file=sys.stderr)
+      raise
+
+    callback(filename, decoded_image)
+
   if src_encoding == encoding:
-    return binary
+    return (filename, binary)
   elif src_encoding == "jpeg" and encoding in ["jpegxl", "jxl"] and level is None:
     return (basename + ".jxl", jpegxl_encode_jpeg(binary, numthreads=num_threads))
   elif src_encoding in ["jpegxl", "jxl"] and encoding == "jpeg" and level is None:
     return (basename + ".jpeg", jpegxl_decode_jpeg(binary, numthreads=num_threads))
   else:
-    try:
-      img = decode(binary, src_encoding, num_threads=num_threads)
-    except:
-      print(f"Decoding Error: {filename}", file=sys.stderr)
-      raise
+    if decoded_image is None:
+      try:
+        img = decode(binary, src_encoding, num_threads=num_threads)
+      except:
+        print(f"Decoding Error: {filename}", file=sys.stderr)
+        raise
+    else:
+      img = decoded_image
 
     try:
       ext, binary = encode(img, encoding, level, **kwargs)
@@ -88,7 +131,7 @@ def decode(binary:bytes, encoding:str, num_threads:Optional[int] = None) -> np.n
   elif encoding == "png":
     return pyspng.load(binary)
   elif encoding == "jpeg":
-    return simplejpeg.decode_jpeg(binary)
+    return decode_jpeg(binary)
   elif encoding in ["jpegxl", "jxl"]:
     return imagecodecs.jpegxl_decode(binary, numthreads=num_threads)
   elif encoding in ["tiff", "tif"]:
@@ -120,7 +163,7 @@ def encode(
       numthreads=num_threads,
     ))
   elif encoding in ["tiff", "tif"]:
-    return npy_to_tiff(img)
+    return (".tiff", npy_to_tiff(img))
   else:
     raise EncodingNotSupported(f"{encoding}")
 
@@ -173,14 +216,28 @@ def encode_jpegxl(arr, level, effort, decodingspeed, numthreads):
     numthreads=numthreads,
   )
 
+def decode_jpeg(binary:bytes) -> np.ndarray:
+    header = simplejpeg.decode_jpeg_header(binary)
+    arr = simplejpeg.decode_jpeg(binary, colorspace=header[3])
+
+    if arr.ndim == 3 and arr.shape[2] == 1:
+      return arr[...,0] # https://github.com/numpy/numpy/issues/29449
+    return arr
+
 def encode_jpeg(arr, quality):
   if not np.issubdtype(arr.dtype, np.uint8):
     raise ValueError(f"Only accepts uint8 arrays. Got: {arr.dtype}")
 
-  arr = np.ascontiguousarray(arr)
-
   if quality is None:
     quality = 85
+
+  if arr.ndim == 2:
+    num_channel = 1
+    arr = arr[..., np.newaxis]
+  else:
+    num_channel = arr.shape[2]
+
+  arr = np.ascontiguousarray(arr)
 
   if num_channel == 1:
     return simplejpeg.encode_jpeg(
