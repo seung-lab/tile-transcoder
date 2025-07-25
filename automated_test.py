@@ -4,10 +4,11 @@ from cloudfiles import CloudFile
 import zipfile
 import subprocess
 import shutil
-
-import transcoder.encoding
-
 import time
+import simplejpeg
+import numpy as np
+import pyspng
+import transcoder.encoding
 
 if not os.path.exists("./test_data/"):
     if not os.path.exists("./tile_transcoder_test_data.zip"):
@@ -51,18 +52,29 @@ def test_png_to_jxl():
 
     assert srcfiles == destfiles
 
-@pytest.mark.parametrize("encoding", [ "bmp", "tiff", "png", "jpeg", "jpegxl" ])
+@pytest.mark.parametrize("encoding", [ "jpeg", "jpegxl", "bmp", "tiff", "png",  ])
 def test_transcoder_function(encoding):
 
     filename = os.listdir(DATA_PATH)[0]
     with open(os.path.join(DATA_PATH, filename), "rb") as f:
         binary = f.read()
 
+    img = transcoder.encoding.decode(binary, encoding="png")
+
     (new_filename, new_binary) = transcoder.encoding.transcode_image(
         filename, binary, encoding=encoding, level=100,
     )
 
     assert len(new_binary) > 0
+
+    recovered_img = transcoder.encoding.decode(new_binary, encoding=encoding)
+
+    if encoding != "jpeg":
+        assert np.all(img == recovered_img)
+    else:
+        assert np.abs(np.max(img.astype(int) - recovered_img.astype(int))) < 3
+        assert np.abs(np.mean(img) - np.mean(recovered_img)) < 3
+
 
 
 
