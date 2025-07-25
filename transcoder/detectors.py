@@ -54,7 +54,7 @@ def tem_subtile_has_tissue(img:npt.NDArray[np.uint8]) -> bool:
     return True
 
   mean = np.mean(img)
-  if mean <= 185:
+  if mean < 185:
     return True
 
   stdev = np.std(img)
