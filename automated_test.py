@@ -20,8 +20,14 @@ if not os.path.exists("./test_data/"):
     with zipfile.ZipFile("./tile_transcoder_test_data.zip", 'r') as zip_ref:
         zip_ref.extractall("test_data")
 
-DATA_PATH = "./test_data/bladeseq-2023.03.30-15.37.47/s013-2023.03.30-15.37.47/subtiles/"
-DEST_PATH = "./test_data/jxl/"
+DATA_PATH = os.path.abspath("./test_data/bladeseq-2023.03.30-15.37.47/s013-2023.03.30-15.37.47/subtiles/")
+DEST_PATH = os.path.abspath("./test_data/dest/")
+
+RESIN_TILES = [
+    'tile_1000_1.png',
+    'tile_1000_2.png',
+    'tile_1000_4.png',
+]
 
 def test_png_to_jxl():
 
@@ -93,6 +99,82 @@ def test_tissue_detector():
 
     bright = np.zeros([6000,6000], dtype=np.uint8) + 186
     assert not transcoder.detectors.tem_subtile_has_tissue(bright)
+
+def test_resin_stay_handling():
+
+    DB_PATH = "./auto_test_xfer.db"
+
+    try:
+        os.remove(DB_PATH)
+    except FileNotFoundError:
+        pass
+
+    try:
+        shutil.rmtree(DEST_PATH)
+    except FileNotFoundError:
+        pass
+
+    init_cmd = f"transcode init {DATA_PATH} {DEST_PATH} --encoding jpeg --level 100 --db {DB_PATH} --ext png --resin stay"    
+    subprocess.run(init_cmd, shell=True)
+    subprocess.run(f"transcode worker -p 2 {DB_PATH} -b 2 --verbose --lease-msec 5000 --codec-threads 0 --cleanup", shell=True)
+
+    srcfiles = os.listdir(DATA_PATH)
+    srcfiles = [ x for x in srcfiles if '.png' in x ]
+    destfiles = os.listdir(DEST_PATH)
+
+    srcfiles = set(srcfiles)
+    srcfiles -= set(RESIN_TILES)
+
+    srcfiles = sorted(list(srcfiles))
+    destfiles = sorted(destfiles)
+
+    srcfiles = [ x.removesuffix(".png") for x in srcfiles ]
+    destfiles = [ x.removesuffix(".jpeg") for x in destfiles ]
+
+    assert srcfiles == destfiles
+
+    assert os.path.exists(os.path.join(os.path.dirname(DATA_PATH), 'logs'))
+
+def test_resin_move_handling():
+
+    DB_PATH = "./auto_test_xfer.db"
+
+    try:
+        os.remove(DB_PATH)
+    except FileNotFoundError:
+        pass
+
+    try:
+        shutil.rmtree(DEST_PATH)
+    except FileNotFoundError:
+        pass
+
+    init_cmd = f"transcode init {DATA_PATH} {DEST_PATH} --encoding jpeg --level 100 --db {DB_PATH} --ext png --resin move"    
+    subprocess.run(init_cmd, shell=True)
+    subprocess.run(f"transcode worker {DB_PATH} -b 1 --verbose --lease-msec 5000 --codec-threads 0 --cleanup", shell=True)
+
+    srcfiles = os.listdir(DATA_PATH)
+    srcfiles = [ x for x in srcfiles if '.png' in x ]
+    destfiles = os.listdir(DEST_PATH)
+
+    srcfiles = set(srcfiles)
+    srcfiles = sorted(list(srcfiles))
+    destfiles = sorted(destfiles)
+
+    srcfiles = [ x.removesuffix(".png") for x in srcfiles ]
+    destfiles = [ x.removesuffix(".jpeg") for x in destfiles ]
+
+    assert srcfiles == destfiles
+
+    resin_path = os.path.join(os.path.dirname(DATA_PATH), 'resin')
+    assert os.path.exists(resin_path)
+    assert set(os.listdir(resin_path)) == set(RESIN_TILES)
+
+    for filename in os.listdir(resin_path):
+        fullpath = os.path.join(resin_path, filename)
+        shutil.move(fullpath, os.path.join(DATA_PATH, filename))
+
+
 
 
 
