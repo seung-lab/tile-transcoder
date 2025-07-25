@@ -32,7 +32,7 @@ You must specify the `--resin $OPTION` option during `transcode init` to activat
 |--------|----------------------------------------------------------------------------------|
 | noop   | Do not even try to detect resin tiles.                                           |
 | log    | Write filenames of detected resin tiles to logs/transcoder.resin.{pid}.log       |
-| move   | Move resin tiles into ../resin/                                                  |
+| move   | Move resin tiles into ../resin/ relative to their current location               |
 | stay   | Same as log + do not transcode the tiles (leave them in place).                  |
 | delete | (NOT IMPLEMENTED) Same as log + delete the resin tile.                           |
 | lossy  | (NOT IMPLEMENTED) Same as log + Compress the resin tile using lossy compression. |
