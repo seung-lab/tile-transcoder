@@ -5,6 +5,8 @@ import zipfile
 import subprocess
 import shutil
 
+import transcoder.encoding
+
 import time
 
 if not os.path.exists("./test_data/"):
@@ -48,3 +50,20 @@ def test_png_to_jxl():
     destfiles.sort()
 
     assert srcfiles == destfiles
+
+@pytest.mark.parametrize("encoding", [ "bmp", "tiff", "png", "jpeg", "jpegxl" ])
+def test_transcoder_function(encoding):
+
+    filename = os.listdir(DATA_PATH)[0]
+    with open(os.path.join(DATA_PATH, filename), "rb") as f:
+        binary = f.read()
+
+    (new_filename, new_binary) = transcoder.encoding.transcode_image(
+        filename, binary, encoding=encoding, level=100,
+    )
+
+    assert len(new_binary) > 0
+
+
+
+

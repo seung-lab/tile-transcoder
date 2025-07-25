@@ -163,7 +163,7 @@ def encode(
       numthreads=num_threads,
     ))
   elif encoding in ["tiff", "tif"]:
-    return npy_to_tiff(img)
+    return (".tiff", npy_to_tiff(img))
   else:
     raise EncodingNotSupported(f"{encoding}")
 
