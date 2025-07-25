@@ -9,6 +9,7 @@ import simplejpeg
 import numpy as np
 import pyspng
 import transcoder.encoding
+import transcoder.detectors
 
 if not os.path.exists("./test_data/"):
     if not os.path.exists("./tile_transcoder_test_data.zip"):
@@ -76,6 +77,22 @@ def test_transcoder_function(encoding):
         assert np.abs(np.mean(img) - np.mean(recovered_img)) < 3
 
 
+def test_tissue_detector():
+    for filename in os.listdir(DATA_PATH):
+        if '.png' not in filename:
+            continue
+        with open(os.path.join(DATA_PATH, filename), "rb") as f:
+            binary = f.read()
+
+        img = transcoder.encoding.decode(binary, encoding="png")
+        has_tissue = transcoder.detectors.tem_subtile_has_tissue(img)
+        assert transcoder.detectors.tem_subtile_has_tissue(img)
+
+    black = np.zeros([6000,6000], dtype=np.uint8)
+    assert transcoder.detectors.tem_subtile_has_tissue(black)
+
+    bright = np.zeros([6000,6000], dtype=np.uint8) + 186
+    assert not transcoder.detectors.tem_subtile_has_tissue(bright)
 
 
 
