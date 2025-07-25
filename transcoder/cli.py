@@ -135,7 +135,7 @@ def _do_work(db, progress, lease_msec, db_timeout, block_size, verbose, codec_th
 @click.option('-b', '--block-size', default=200, help="Number of files to process at a time.", show_default=True)
 @click.option('--verbose', is_flag=True, default=False, help="Print more about what the worker is doing.", show_default=True)
 @click.option('--db-timeout', default=5.0, type=float, help="How many seconds to wait when the SQLite DB is locked. Use higher values under multi-process contention.", show_default=True)
-@click.option('--ramp-sec', default=0.0, type=float, help="How many seconds to wait between launching additional processes.", show_default=True)
+@click.option('--ramp-sec', default=0.25, type=float, help="How many seconds to wait between launching additional processes.", show_default=True)
 @click.option('--cleanup', is_flag=True, default=False, help="Delete the database when finished.")
 @click.option('--codec-threads', default=0, type=int, help="For codecs that support multiple threads, use this number of threads (0 = num cores). Supported codecs: jxl", show_default=True)
 def worker(
