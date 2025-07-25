@@ -131,7 +131,7 @@ def decode(binary:bytes, encoding:str, num_threads:Optional[int] = None) -> np.n
   elif encoding == "png":
     return pyspng.load(binary)
   elif encoding == "jpeg":
-    return simplejpeg.decode_jpeg(binary)
+    return decode_jpeg(binary)
   elif encoding in ["jpegxl", "jxl"]:
     return imagecodecs.jpegxl_decode(binary, numthreads=num_threads)
   elif encoding in ["tiff", "tif"]:
@@ -215,6 +215,14 @@ def encode_jpegxl(arr, level, effort, decodingspeed, numthreads):
     decodingspeed=decodingspeed,
     numthreads=numthreads,
   )
+
+def decode_jpeg(binary:bytes) -> np.ndarray:
+    header = simplejpeg.decode_jpeg_header(binary)
+    arr = simplejpeg.decode_jpeg(binary, colorspace=header[3])
+
+    if arr.ndim == 3 and arr.shape[2] == 1:
+      return arr[...,0] # https://github.com/numpy/numpy/issues/29449
+    return arr
 
 def encode_jpeg(arr, quality):
   if not np.issubdtype(arr.dtype, np.uint8):
