@@ -92,7 +92,8 @@ def test_tissue_detector():
 
         img = transcoder.encoding.decode(binary, encoding="png")
         has_tissue = transcoder.detectors.tem_subtile_has_tissue(img)
-        assert transcoder.detectors.tem_subtile_has_tissue(img)
+
+        assert transcoder.detectors.tem_subtile_has_tissue(img) != (filename in RESIN_TILES)
 
     black = np.zeros([6000,6000], dtype=np.uint8)
     assert transcoder.detectors.tem_subtile_has_tissue(black)
@@ -134,6 +135,7 @@ def test_resin_stay_handling():
     assert srcfiles == destfiles
 
     assert os.path.exists(os.path.join(os.path.dirname(DATA_PATH), 'logs'))
+    shutil.rmtree(os.path.join(os.path.dirname(DATA_PATH), 'logs'))
 
 def test_resin_move_handling():
 
@@ -173,6 +175,8 @@ def test_resin_move_handling():
     for filename in os.listdir(resin_path):
         fullpath = os.path.join(resin_path, filename)
         shutil.move(fullpath, os.path.join(DATA_PATH, filename))
+
+    shutil.rmtree(os.path.join(os.path.dirname(DATA_PATH), 'logs'))
 
 
 
