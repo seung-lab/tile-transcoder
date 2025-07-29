@@ -50,7 +50,7 @@ def tem_subtile_has_tissue(img:npt.NDArray[np.uint8]) -> bool:
   hist, bin_edges = np.histogram(img.ravel(), bins=20)
   peak_idxs, bounds = scipy.signal.find_peaks(hist, height=500, threshold=4000)
 
-  if len(peak_idxs) >= 1:
+  if len(peak_idxs) > 1:
     return True
 
   mean = np.mean(img)
