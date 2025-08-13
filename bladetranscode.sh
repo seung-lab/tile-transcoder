@@ -7,7 +7,7 @@
 # dependencies:
 # tile transcoder: https://github.com/seung-lab/tile-transcoder
 #  (install Pillow and imagecodecs too)
-# GNU Parallel
+# requires cloud-files>=5.8.0
 
 # bladetranscode /mnt/sink/scratch/yannan/.../bladeseq-2025.02.07-16.47.17/ /mnt/sink/scratch/yannan/.../jxl/
 
@@ -20,15 +20,16 @@ SOURCE="$SOURCE/$SECTION"
 
 DEST="$DEST/$BSEQ/$SECTION"
 
-mkdir -p $DEST
+cloudfiles mkdir $DEST
 
-DBNAME=/home/voxa/transcode_dbs/transcode-$(date +%s).db
+cloudfiles mkdir $HOME/transcode_dbs/
+DBNAME=$HOME/transcode_dbs/transcode-$(date +%s).db
 
-cp $SOURCE/*.jpg $DEST/
-cp -r $SOURCE/metadata $DEST/
-cp -r $SOURCE/montage $DEST/
-mkdir -p $DEST/subtiles/metadata/
-cp -r $SOURCE/subtiles/metadata/ $DEST/subtiles/
+cloudfiles cp $SOURCE/*.jpg $DEST/
+cloudfiles cp -r $SOURCE/metadata $DEST/
+cloudfiles cp -r $SOURCE/montage $DEST/
+cloudfiles mkdir $DEST/subtiles/metadata/
+cloudfiles cp -r $SOURCE/subtiles/metadata/ $DEST/subtiles/
 
 echo "Database: $DBNAME"
 transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --level 100 --jxl-effort 2 --jxl-decoding-speed 0
