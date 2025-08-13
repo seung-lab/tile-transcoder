@@ -35,8 +35,8 @@ echo "Database: $DBNAME"
 transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --level 100 --jxl-effort 2 --jxl-decoding-speed 0
 transcode worker --parallel 7 -b 1 --codec-threads 4 --lease-msec 60000 --db-timeout 10000 --ramp-sec 0.25 $DBNAME --progress --cleanup
 
-bmp_files=$(find "$SOURCE/subtiles" -type f -name '*.bmp' -printf '%f\n' | sed 's/\.bmp$//' | sort)
-jxl_files=$(find "$DEST/subtiles" -type f -name '*.jxl' -printf '%f\n' | sed 's/\.jxl$//' | sort)
+bmp_files=$(cloudfiles ls "$SOURCE/subtiles/*.bmp" | sed 's/\.bmp$//' | sort)
+jxl_files=$(cloudfiles ls "$DEST/subtiles/*.jxl" | sed 's/\.jxl$//' | sort)
 
 if [ "$bmp_files" != "$jxl_files" ]; then
     echo "Error: Directory contents differ:"
@@ -44,25 +44,11 @@ if [ "$bmp_files" != "$jxl_files" ]; then
     exit 1
 fi
 
-
-get_file_size() {
-    local file="$1"
-    # Try GNU stat first, then BSD stat, then fallback to wc
-    if size=$(stat -c %s "$file" 2>/dev/null); then
-        echo "$size"
-    elif size=$(stat -f %z "$file" 2>/dev/null); then
-        echo "$size"
-    else
-        # Last resort: wc -c (slower as it reads the file)
-        wc -c < "$file" | tr -d ' '
-    fi
-}
-
-for fname in $(ls $DEST/subtiles); do
-    fqpath="$DEST/subtiles/$fname"
-    size=$(get_file_size $fqpath)
-    if [ "$size" -eq 0 ] && [ ! -d "$fqpath" ]; then
-        echo "$fqpath was zero bytes. Maybe the copy operation failed?"
+for row in $(cloudfiles du $DEST/subtiles); do
+    size=$(echo $row | awk '{print $1}')
+    fname=$(echo $row | awk '{print $2}')
+    if [ "$size" -eq 0 ] && [ ! -d "$fname" ]; then
+        echo "$fname was zero bytes. Maybe the copy operation failed?"
         exit 1
     fi
 done;
