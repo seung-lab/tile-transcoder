@@ -32,7 +32,7 @@ cp -r $SOURCE/subtiles/metadata/ $DEST/subtiles/
 
 echo "Database: $DBNAME"
 transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --level 100 --jxl-effort 2 --jxl-decoding-speed 0
-transcode worker --parallel 28 -b 2 --lease-msec 60000 --db-timeout 10000 --ramp-sec 0.25 $DBNAME --progress --cleanup
+transcode worker --parallel 7 -b 1 --codec-threads 4 --lease-msec 60000 --db-timeout 10000 --ramp-sec 0.25 $DBNAME --progress --cleanup
 
 bmp_files=$(find "$SOURCE/subtiles" -type f -name '*.bmp' -printf '%f\n' | sed 's/\.bmp$//' | sort)
 jxl_files=$(find "$DEST/subtiles" -type f -name '*.jxl' -printf '%f\n' | sed 's/\.jxl$//' | sort)
