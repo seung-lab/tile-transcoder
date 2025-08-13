@@ -38,5 +38,13 @@ You must specify the `--resin $OPTION` option during `transcode init` to activat
 | lossy  | (NOT IMPLEMENTED) Same as log + Compress the resin tile using lossy compression. |
 
 
+# Installation
+
+To transcode to remote locations, you will need to ensure cloud-files is configured with the appropriate secrets.
+
+```bash
+git clone https://github.com/seung-lab/tile-transcoder.git
+pip install "./tile-transcoder[all]"
+```
 
 
