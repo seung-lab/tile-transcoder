@@ -21,21 +21,22 @@ def normalize_path(cloudpath:str) -> str:
   return cloudpath
 
 def natural_time_delta(seconds:float) -> str:
-  if seconds == 0.0:
+  sec = abs(seconds)
+  if sec == 0.0:
     return f"just now"
-  elif seconds < 60:
-    return f"{int(seconds)} seconds {'from now' if seconds > 0 else 'ago'}"
-  elif seconds < 3600:
-    minutes = int(seconds / 60)
+  elif sec < 60:
+    return f"{int(sec)} seconds {'from now' if seconds > 0 else 'ago'}"
+  elif sec < 3600:
+    minutes = int(sec / 60)
     return f"{minutes} minutes {'from now' if seconds > 0 else 'ago'}"
-  elif seconds < 86400:
-    hours = int(seconds / 3600)
+  elif sec < 86400:
+    hours = int(sec / 3600)
     return f"{hours} hours {'from now' if seconds > 0 else 'ago'}"
-  elif seconds < 86400 * 365 * 80:
-    days = int(seconds / 86400)
+  elif sec < 86400 * 365 * 80:
+    days = int(sec / 86400)
     return f"{days} days {'from now' if seconds > 0 else 'ago'}"
   else:
-    return f"fully stalled"
+    return f"never"
 
 @click.group("main")
 def cli_main():
