@@ -34,7 +34,7 @@ def natural_time_delta(seconds:float) -> str:
   elif seconds < 86400 * 365 * 80:
     days = int(seconds / 86400)
     return f"{days} days {'from now' if seconds > 0 else 'ago'}"
-  elif:
+  else:
     return f"fully stalled"
 
 @click.group("main")
