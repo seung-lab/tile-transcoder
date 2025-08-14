@@ -31,9 +31,11 @@ def natural_time_delta(seconds:float) -> str:
   elif seconds < 86400:
     hours = int(seconds / 3600)
     return f"{hours} hours {'from now' if seconds > 0 else 'ago'}"
-  else:
+  elif seconds < 86400 * 365 * 80:
     days = int(seconds / 86400)
     return f"{days} days {'from now' if seconds > 0 else 'ago'}"
+  elif:
+    return f"fully stalled"
 
 @click.group("main")
 def cli_main():
@@ -240,7 +242,7 @@ def status(db, measure):
   leased = rt.rfs.num_leased()
   errors = rt.rfs.num_errors()
 
-  if measure > 0:
+  if measure > 0 and remaining > 0:
     time.sleep(measure)
     remaining2 = rt.rfs.remaining()
     completed2 = total - remaining2
@@ -252,10 +254,17 @@ def status(db, measure):
   print(f"{errors} errors ({errors/total*100.0:.2f}%)")
   print(f"{total} total")
 
-  if measure > 0:
+  if measure > 0 and remaining > 0:
     elapsed = e - s
+
+    if remaining2 == 0:
+      print("finished.")
+      return
+
     rate = (completed2 - completed) / elapsed
-    eta = remaining2 / rate
+    eta = float('inf')
+    if rate != 0:
+      eta = remaining2 / rate
     print('--')
     print(f"{rate:.1f} tiles per sec.")
     print(f"done in {natural_time_delta(eta)}")
