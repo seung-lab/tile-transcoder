@@ -256,8 +256,9 @@ def status(db, measure):
     elapsed = e - s
     rate = (completed2 - completed) / elapsed
     eta = remaining2 / rate
-    print(f"{rate:.1f} per sec.")
-    print(natural_time_delta(eta))
+    print('--')
+    print(f"{rate:.1f} tiles per sec.")
+    print("done in ", natural_time_delta(eta))
 
 @cli_main.command("release")
 @click.argument("db")
