@@ -1,8 +1,8 @@
 import click
+import multiprocessing as mp
 import os.path
 import time
 
-import multiprocessing as mp
 from tqdm import tqdm
 
 from cloudfiles import CloudFiles
@@ -15,10 +15,25 @@ from .resumable import ResumableTransfer
 
 mp.set_start_method("spawn", force=True)
 
-def normalize_path(cloudpath):
+def normalize_path(cloudpath:str) -> str:
   if not get_protocol(cloudpath):
     return "file://" + toabs(cloudpath)
   return cloudpath
+
+def natural_time_delta(seconds:float) -> str:
+  if seconds == 0.0:
+    return f"just now"
+  elif seconds < 60:
+    return f"{int(seconds)} seconds {'from now' if seconds > 0 else 'ago'}"
+  elif seconds < 3600:
+    minutes = int(seconds / 60)
+    return f"{minutes} minutes {'from now' if seconds > 0 else 'ago'}"
+  elif seconds < 86400:
+    hours = int(seconds / 3600)
+    return f"{hours} hours {'from now' if seconds > 0 else 'ago'}"
+  else:
+    days = int(seconds / 86400)
+    return f"{days} days {'from now' if seconds > 0 else 'ago'}"
 
 @click.group("main")
 def cli_main():
@@ -212,19 +227,37 @@ def worker(
 
 @cli_main.command("status")
 @click.argument("db")
-def status(db):
+@click.option('--measure', default=0.0, type=float, help="Measure task rate and ETA over this many seconds if > 0.", show_default=True)
+def status(db, measure):
   """Print how many tasks are enqueued."""
   rt = ResumableTransfer(db)
+
+  s = time.monotonic()
+
   total = rt.rfs.total()
   remaining = rt.rfs.remaining()
   completed = total - remaining
   leased = rt.rfs.num_leased()
   errors = rt.rfs.num_errors()
+
+  if measure > 0:
+    time.sleep(measure)
+    remaining2 = rt.rfs.remaining()
+    completed2 = total - remaining2
+    e = time.monotonic()
+
   print(f"{remaining} remaining ({remaining/total*100.0:.2f}%)")
   print(f"{completed} completed ({completed/total*100.0:.2f}%)")
   print(f"{leased} leased ({leased/total*100.0:.2f}%)")
   print(f"{errors} errors ({errors/total*100.0:.2f}%)")
   print(f"{total} total")
+
+  if measure > 0:
+    elapsed = e - s
+    rate = (completed2 - completed) / elapsed
+    eta = remaining2 / rate
+    print(f"{rate:.1f} per sec.")
+    print(natural_time_delta(eta))
 
 @cli_main.command("release")
 @click.argument("db")
