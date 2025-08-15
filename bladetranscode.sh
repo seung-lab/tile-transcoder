@@ -35,8 +35,8 @@ echo "Database: $DBNAME"
 transcode init "$SOURCE/subtiles" "$DEST/subtiles" --db $DBNAME --ext bmp --encoding jxl --compression none --level 100 --jxl-effort 2 --jxl-decoding-speed 0
 transcode worker --parallel 7 -b 1 --codec-threads 4 --lease-msec 60000 --db-timeout 10000 --ramp-sec 0.25 $DBNAME --progress --cleanup
 
-bmp_files=$(cloudfiles ls "$SOURCE/subtiles/*.bmp" | sed 's/\.bmp$//' | sort)
-jxl_files=$(cloudfiles ls "$DEST/subtiles/*.jxl" | sed 's/\.jxl$//' | sort)
+bmp_files=$(cloudfiles ls "$SOURCE/subtiles/*.bmp" | sed 's#.*/##; s/\.bmp$//' | sort)
+jxl_files=$(cloudfiles ls "$DEST/subtiles/*.jxl" | sed 's#.*/##; s/\.jxl$//' | sort)
 
 if [ "$bmp_files" != "$jxl_files" ]; then
     echo "Error: Directory contents differ:"
