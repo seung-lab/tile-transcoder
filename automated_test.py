@@ -92,11 +92,11 @@ def test_tissue_detector():
 
         img = transcoder.encoding.decode(binary, encoding="png")
         has_tissue = transcoder.detectors.tem_subtile_has_tissue(img)
-
-        assert transcoder.detectors.tem_subtile_has_tissue(img) != (filename in RESIN_TILES)
+        gt_has_tissue = not (filename in RESIN_TILES)
+        assert has_tissue == gt_has_tissue 
 
     black = np.zeros([6000,6000], dtype=np.uint8)
-    assert transcoder.detectors.tem_subtile_has_tissue(black)
+    assert not transcoder.detectors.tem_subtile_has_tissue(black)
 
     bright = np.zeros([6000,6000], dtype=np.uint8) + 186
     assert not transcoder.detectors.tem_subtile_has_tissue(bright)
