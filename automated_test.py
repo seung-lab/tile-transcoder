@@ -18,7 +18,8 @@ if not os.path.exists("./test_data/"):
         )
 
     with zipfile.ZipFile("./tile_transcoder_test_data.zip", 'r') as zip_ref:
-        zip_ref.extractall("test_data")
+        zip_ref.extractall(".")
+        shutil.rmtree("__MACOSX")
 
 DATA_PATH = os.path.abspath("./test_data/bladeseq-2023.03.30-15.37.47/s013-2023.03.30-15.37.47/subtiles/")
 DEST_PATH = os.path.abspath("./test_data/dest/")
