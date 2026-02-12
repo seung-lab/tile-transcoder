@@ -24,6 +24,13 @@ if not os.path.exists("./test_data/"):
 DATA_PATH = os.path.abspath("./test_data/bladeseq-2023.03.30-15.37.47/s013-2023.03.30-15.37.47/subtiles/")
 DEST_PATH = os.path.abspath("./test_data/dest/")
 
+BLACK_TILES = [
+    'tile_0000_4.png',
+    'tile_0000_5.png',
+    'tile_0000_6.png',
+    'tile_0000_7.png',
+]
+
 RESIN_TILES = [
     'tile_1000_1.png',
     'tile_1000_2.png',
@@ -169,9 +176,11 @@ def test_resin_move_handling():
 
     assert srcfiles == destfiles
 
+    non_tissue_tiles = set(RESIN_TILES + BLACK_TILES)
+
     resin_path = os.path.join(os.path.dirname(DATA_PATH), 'resin')
     assert os.path.exists(resin_path)
-    assert set(os.listdir(resin_path)) == set(RESIN_TILES)
+    assert set(os.listdir(resin_path)) == non_tissue_tiles
 
     for filename in os.listdir(resin_path):
         fullpath = os.path.join(resin_path, filename)
