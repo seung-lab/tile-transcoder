@@ -37,6 +37,8 @@ RESIN_TILES = [
     'tile_1000_4.png',
 ]
 
+NON_TISSUE_TILES = RESIN_TILES + BLACK_TILES
+
 def test_png_to_jxl():
 
     DB_PATH = "./auto_test_xfer.db"
@@ -100,7 +102,7 @@ def test_tissue_detector():
 
         img = transcoder.encoding.decode(binary, encoding="png")
         has_tissue = transcoder.detectors.tem_subtile_has_tissue(img)
-        gt_has_tissue = not (filename in RESIN_TILES)
+        gt_has_tissue = not (filename in NON_TISSUE_TILES)
         assert has_tissue == gt_has_tissue 
 
     black = np.zeros([6000,6000], dtype=np.uint8)
@@ -132,7 +134,7 @@ def test_resin_stay_handling():
     destfiles = os.listdir(DEST_PATH)
 
     srcfiles = set(srcfiles)
-    srcfiles -= set(RESIN_TILES)
+    srcfiles -= set(NON_TISSUE_TILES)
 
     srcfiles = sorted(list(srcfiles))
     destfiles = sorted(destfiles)
@@ -176,11 +178,9 @@ def test_resin_move_handling():
 
     assert srcfiles == destfiles
 
-    non_tissue_tiles = set(RESIN_TILES + BLACK_TILES)
-
     resin_path = os.path.join(os.path.dirname(DATA_PATH), 'resin')
     assert os.path.exists(resin_path)
-    assert set(os.listdir(resin_path)) == non_tissue_tiles
+    assert set(os.listdir(resin_path)) == set(NON_TISSUE_TILES)
 
     for filename in os.listdir(resin_path):
         fullpath = os.path.join(resin_path, filename)
