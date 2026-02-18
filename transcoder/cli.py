@@ -15,6 +15,22 @@ from .resumable import ResumableTransfer
 
 mp.set_start_method("spawn", force=True)
 
+def SI(val):
+  if val < 1024:
+    return f"{val} bytes"
+  elif val < 2**20:
+    return f"{(val / 2**10):.2f} KiB"
+  elif val < 2**30:
+    return f"{(val / 2**20):.2f} MiB"
+  elif val < 2**40:
+    return f"{(val / 2**30):.2f} GiB"
+  elif val < 2**50:
+    return f"{(val / 2**40):.2f} TiB"
+  elif val < 2**60:
+    return f"{(val / 2**50):.2f} PiB"
+  else:
+    return f"{(val / 2**60):.2f} EiB"
+
 def normalize_path(cloudpath:str) -> str:
   if not get_protocol(cloudpath):
     return "file://" + toabs(cloudpath)
@@ -233,8 +249,9 @@ def worker(
 
 @cli_main.command("status")
 @click.argument("db")
-@click.option('--measure', default=0.0, type=float, help="Measure task rate and ETA over this many seconds if > 0.", show_default=True)
-def status(db, measure):
+@click.option('--eta', default=0.0, type=float, help="Measure task rate and ETA over this many seconds if > 0.", show_default=True)
+@click.option('--raw-counts', is_flag=True, default=False, help="Switch off human readability for counts.", show_default=True)
+def status(db, eta, raw_counts):
   """Print how many tasks are enqueued."""
   rt = ResumableTransfer(db)
 
@@ -253,21 +270,24 @@ def status(db, measure):
   if original_bytes_processed != 0:
     ratio = transcoded_bytes_processed / original_bytes_processed
 
-  if measure > 0 and remaining > 0:
-    time.sleep(measure)
+  if eta > 0 and remaining > 0:
+    time.sleep(eta)
     remaining2 = rt.rfs.remaining()
     completed2 = total - remaining2
     e = time.monotonic()
+
+  raw_counts_fn = lambda x: f"{x} bytes"
+  dispfn = raw_counts_fn if raw_counts else SI
 
   print(f"{remaining} remaining ({remaining/total*100.0:.2f}%)")
   print(f"{completed} completed ({completed/total*100.0:.2f}%)")
   print(f"{leased} leased ({leased/total*100.0:.2f}%)")
   print(f"{errors} errors ({errors/total*100.0:.2f}%)")
   print(f"{total} total files")
-  print(f"{original_bytes_processed} original bytes")
-  print(f"{transcoded_bytes_processed} transcoded bytes ({ratio*100.0:.2f}%)")
+  print(f"{dispfn(original_bytes_processed)} original")
+  print(f"{dispfn(transcoded_bytes_processed)} transcoded ({ratio*100.0:.2f}%)")
 
-  if measure > 0 and remaining > 0:
+  if eta > 0 and remaining > 0:
     elapsed = e - s
 
     if remaining2 == 0:
@@ -275,12 +295,12 @@ def status(db, measure):
       return
 
     rate = (completed2 - completed) / elapsed
-    eta = float('inf')
+    prediction = float('inf')
     if rate != 0:
-      eta = remaining2 / rate
+      prediction = remaining2 / rate
     print('--')
     print(f"{rate:.1f} tiles per sec.")
-    print(f"done in {natural_time_delta(eta)}")
+    print(f"done in {natural_time_delta(prediction)}")
 
 @cli_main.command("release")
 @click.argument("db")
