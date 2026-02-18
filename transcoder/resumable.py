@@ -456,6 +456,8 @@ class ResumableTransfer:
               )
             except SkipTranscoding:
               continue
+            except KeyboardInterrupt:
+              raise
             except Exception as err:
               if verbose:
                 print(f"{filename} error: {err}")
