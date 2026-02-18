@@ -142,8 +142,11 @@ def xferinit(
     print("WARNING: No files inserted into the database. Is your filter extension correct?")
 
 def _do_work(db, progress, lease_msec, db_timeout, block_size, verbose, codec_threads):
-  rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
-  rt.execute(progress=progress, block_size=block_size, verbose=verbose, codec_threads=codec_threads)
+  try:
+    rt = ResumableTransfer(db, lease_msec, db_timeout=db_timeout)
+    rt.execute(progress=progress, block_size=block_size, verbose=verbose, codec_threads=codec_threads)
+  except KeyboardInterrupt:
+    pass
 
 @cli_main.command("worker")
 @click.argument("db")
