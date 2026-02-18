@@ -159,8 +159,10 @@ class ResumableFileSet:
       )
     """)
     cur.execute(
-      "INSERT INTO stats(id, key, value) VALUES (?,?,?)",
-      [1, 'finished', 0]
+      "INSERT INTO stats(id, key, value) VALUES (?,?,?), (?,?,?), (?,?,?)",
+      [1, 'finished', 0,
+       2, 'bytes_original', 0,
+       3, 'bytes_transcoded', 0],
     )
 
     cur.close()
@@ -254,14 +256,21 @@ class ResumableFileSet:
 
     return meta
 
-  def mark_finished(self, fname_iter):
+  def mark_finished(self, fname_iter, bytes_orig:int, bytes_transcoded:int):
     cur = self.conn.cursor()
 
+    num_files = 0
+
+    cur.execute("BEGIN")
     for filenames in sip(fname_iter, SQLITE_MAX_PARAMS):
       bindlist = ",".join([f"{BIND}"] * len(filenames))
       cur.execute(f"UPDATE filelist SET finished = 1 WHERE filename in ({bindlist})", filenames)
-      cur.execute(f"UPDATE stats SET value = value + {len(filenames)} WHERE id = 1")
-      cur.execute("commit")
+      num_files += len(filenames)
+
+    cur.execute(f"UPDATE stats SET value = value + {num_files} WHERE id = 1")
+    cur.execute(f"UPDATE stats SET value = value + {bytes_orig} WHERE id = 2")
+    cur.execute(f"UPDATE stats SET value = value + {bytes_transcoded} WHERE id = 3")
+    cur.execute("COMMIT")
     cur.close()
 
   def next(self, limit=None, reservation=None):
@@ -310,6 +319,12 @@ class ResumableFileSet:
     self._total = self._scalar_query(f"SELECT max(id) FROM filelist")
     self._total_dirty = False
     return self._total
+
+  def original_bytes_processed(self) -> int:
+    return self._scalar_query(f"SELECT value FROM stats WHERE id = 2")
+
+  def transcoded_bytes_processed(self) -> int:
+    return self._scalar_query(f"SELECT value FROM stats WHERE id = 3")
 
   def finished(self) -> int:
     return self._scalar_query(f"SELECT value FROM stats WHERE id = 1")
@@ -437,7 +452,10 @@ class ResumableTransfer:
       pbar.refresh()
       for paths in sip(self.rfs, block_size):
         if meta["reencode"] is None:
-          cf_src.transfer_to(meta["dest"], paths=paths, reencode=meta["recompress"])
+          tm = cf_src.transfer_to(meta["dest"], paths=paths, reencode=meta["recompress"])
+          total_bytes = tm.total_bytes()
+          original_bytes = total_bytes
+          transcoded_bytes = total_bytes
         else:
           files = cf_src.get(paths, return_dict=True)
 
@@ -486,10 +504,13 @@ class ResumableTransfer:
 
           cf_dest.puts(reencoded, raw=True)
 
+          original_bytes = sum(( len(binary) for binary in files.values() ))
+          transcoded_bytes = sum(( len(f["content"]) for f in reencoded  ))
+
         if meta["delete_original"]:
           cf_src.delete(original_filenames)
         
-        self.rfs.mark_finished(paths)
+        self.rfs.mark_finished(paths, original_bytes, transcoded_bytes)
         
         pbar.n = self.rfs.finished()
         pbar.refresh()

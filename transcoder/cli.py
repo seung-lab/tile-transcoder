@@ -246,6 +246,13 @@ def status(db, measure):
   leased = rt.rfs.num_leased()
   errors = rt.rfs.num_errors()
 
+  original_bytes_processed = rt.rfs.original_bytes_processed()
+  transcoded_bytes_processed = rt.rfs.transcoded_bytes_processed()
+
+  ratio = 1.0
+  if original_bytes_processed != 0:
+    ratio = transcoded_bytes_processed / original_bytes_processed
+
   if measure > 0 and remaining > 0:
     time.sleep(measure)
     remaining2 = rt.rfs.remaining()
@@ -256,7 +263,9 @@ def status(db, measure):
   print(f"{completed} completed ({completed/total*100.0:.2f}%)")
   print(f"{leased} leased ({leased/total*100.0:.2f}%)")
   print(f"{errors} errors ({errors/total*100.0:.2f}%)")
-  print(f"{total} total")
+  print(f"{total} total files")
+  print(f"{original_bytes_processed} original bytes")
+  print(f"{transcoded_bytes_processed} transcoded bytes ({ratio*100.0:.2f}%)")
 
   if measure > 0 and remaining > 0:
     elapsed = e - s
