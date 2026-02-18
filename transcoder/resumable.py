@@ -444,6 +444,12 @@ class ResumableTransfer:
           reencoded = []
           original_filenames = []
           for filename, binary in files.items():
+            if binary in (None, b''):
+              if verbose:
+                print(f"{filename} is missing.")
+              self.rfs.record_error(filename, "missing file.")
+              continue
+
             try:
               if verbose:
                 print(f"{filename} to {meta['reencode']}")
