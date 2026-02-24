@@ -247,6 +247,16 @@ def worker(
   if cleanup:
     rt.close()
 
+@cli_main.command("meta")
+@click.argument("db")
+def meta(db):
+  """Print basic information about the job."""
+  rt = ResumableTransfer(db)
+  meta = rt.rfs.metadata()
+
+  for k,v in meta.items():
+    print(f"{k}: {v}")
+
 @cli_main.command("status")
 @click.argument("db")
 @click.option('--eta', default=0.0, type=float, help="Measure task rate and ETA over this many seconds if > 0.", show_default=True)
