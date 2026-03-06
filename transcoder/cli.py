@@ -257,12 +257,8 @@ def meta(db):
   for k,v in meta.items():
     print(f"{k}: {v}")
 
-@cli_main.command("status")
-@click.argument("db")
-@click.option('--eta', default=0.0, type=float, help="Measure task rate and ETA over this many seconds if > 0.", show_default=True)
-@click.option('--raw-counts', is_flag=True, default=False, help="Switch off human readability for counts.", show_default=True)
-def status(db, eta, raw_counts):
-  """Print how many tasks are enqueued."""
+
+def status_helper(db, eta, raw_counts):
   rt = ResumableTransfer(db)
 
   s = time.monotonic()
@@ -311,6 +307,24 @@ def status(db, eta, raw_counts):
     print('--')
     print(f"{rate:.1f} tiles per sec.")
     print(f"done in {natural_time_delta(prediction)}")
+
+
+@cli_main.command("status")
+@click.argument("db", nargs=-1)
+@click.option('--eta', default=0.0, type=float, help="Measure task rate and ETA over this many seconds if > 0.", show_default=True)
+@click.option('--raw-counts', is_flag=True, default=False, help="Switch off human readability for counts.", show_default=True)
+def status(db, eta, raw_counts):
+  """Print how many tasks are enqueued."""
+  
+  if len(db) == 1:
+    status_helper(db[0], eta, raw_counts)
+    return
+
+  for db_single in db:
+    print(f"File: {db_single}")
+    status_helper(db_single, eta, raw_counts)
+    print()
+
 
 @cli_main.command("release")
 @click.argument("db")
