@@ -327,11 +327,12 @@ def status(db, eta, raw_counts):
 
 
 @cli_main.command("release")
-@click.argument("db")
+@click.argument("db", nargs=-1)
 def release(db):
   """Release all leased tasks to the available pool."""
-  rt = ResumableTransfer(db)
-  rt.rfs.release()
+  for db_single in db:
+    rt = ResumableTransfer(db_single)
+    rt.rfs.release()
 
 
 
