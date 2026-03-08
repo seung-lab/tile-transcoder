@@ -11,6 +11,8 @@ import pyspng
 import transcoder.encoding
 import transcoder.detectors
 
+import sqlite3
+
 if not os.path.exists("./test_data/"):
     if not os.path.exists("./tile_transcoder_test_data.zip"):
         Cloudfile("./tile_transcoder_test_data.zip").transfer_from(
@@ -427,3 +429,62 @@ def test_delete_original_in_place():
     
     cleanup_paths(DB_PATH, source_path)
 
+def test_missing_files_handled():
+    """Test that missing files are marked as MISSING and don't block completion."""
+    
+    DB_PATH = "./test_missing_files.db"
+    source_path = setup_test_source("missing")
+    dest_path = os.path.abspath("./test_data/dest_missing/")
+    
+    cleanup_paths(DB_PATH, dest_path)
+    
+    original_files = [f for f in os.listdir(source_path) if f.endswith('.png')]
+    original_count = len(original_files)
+    
+    # Pick a few files to delete from source to simulate missing files
+    missing_files = original_files[:2]
+    for f in missing_files:
+        os.remove(os.path.join(source_path, f))
+    
+    expected_transcoded = original_count - len(missing_files)
+    
+    init_cmd = (
+        f"transcode init {source_path} {dest_path} "
+        f"--encoding jpeg --level 95 --db {DB_PATH} --ext png"
+    )
+    subprocess.run(init_cmd, shell=True, check=True)
+    
+    # Add the missing filenames back into the db manually
+    # (init scanned source_path after deletion, so we insert them directly)
+    conn = sqlite3.connect(DB_PATH)
+    for f in missing_files:
+        conn.execute(
+            "INSERT INTO filelist (filename, finished, lease) VALUES (?, 0, 0)", [f]
+        )
+    conn.commit()
+    conn.close()
+    
+    worker_cmd = (
+        f"transcode worker {DB_PATH} -b 2 --verbose "
+        f"--lease-msec 5000 --codec-threads 0 --cleanup"
+    )
+    result = subprocess.run(worker_cmd, shell=True)
+    assert result.returncode == 0
+    
+    # Check that the right number of files were transcoded
+    dest_files = os.listdir(dest_path)
+    assert len(dest_files) == expected_transcoded, (
+        f"Expected {expected_transcoded} transcoded files, got {len(dest_files)}"
+    )
+    
+    # Verify missing files are marked as MISSING (status=2) in the db
+    conn = sqlite3.connect(DB_PATH)
+    for f in missing_files:
+        row = conn.execute(
+            "SELECT finished FROM filelist WHERE filename = ?", [f]
+        ).fetchone()
+        assert row is not None, f"Missing file {f} not found in db"
+        assert row[0] == 3, f"Expected status MISSING (3) for {f}, got {row[0]}"
+    conn.close()
+    
+    cleanup_paths(DB_PATH, source_path, dest_path)
