@@ -6,6 +6,7 @@ from typing import (
 )
 
 import datetime
+from enum import IntEnum
 import io
 import os
 import sqlite3
@@ -21,6 +22,12 @@ from .detectors import ResinHandling, make_resin_action
 from .content_types import content_type
 from .encoding import transcode_image
 from .exceptions import SkipTranscoding
+
+class FileStatus(IntEnum):
+  AVAILABLE = 0
+  COMPLETE = 1
+  ERROR = 2
+  MISSING = 3
 
 # the maximum value of a host parameter number is 
 # SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999 
@@ -85,6 +92,7 @@ class ResumableFileSet:
     cur.execute("""DROP TABLE IF EXISTS xfermeta""")
     cur.execute("""DROP TABLE IF EXISTS stats""")
     cur.execute("""DROP TABLE IF EXISTS errors""")
+    cur.execute("""DROP TABLE IF EXISTS filestatus""")
 
     cur.execute(f"""
       CREATE TABLE xfermeta (
@@ -159,10 +167,26 @@ class ResumableFileSet:
       )
     """)
     cur.execute(
-      "INSERT INTO stats(id, key, value) VALUES (?,?,?), (?,?,?), (?,?,?)",
+      "INSERT INTO stats(id, key, value) VALUES (?,?,?), (?,?,?), (?,?,?), (?,?,?)",
       [1, 'finished', 0,
        2, 'bytes_original', 0,
-       3, 'bytes_transcoded', 0],
+       3, 'bytes_transcoded', 0,
+       4, 'missing', 0,
+      ],
+    )
+
+    cur.execute(f"""
+      CREATE TABLE filestatus (
+        id {INTEGER} PRIMARY KEY {AUTOINC},
+        value TEXT NOT NULL
+      )
+    """)
+    cur.execute(
+      "INSERT INTO filestatus(id, value) VALUES (?,?), (?,?), (?,?), (?,?)",
+      [0, 'available',
+       1, 'complete',
+       2, 'error',
+       3, 'missing',],
     )
 
     cur.close()
@@ -181,7 +205,7 @@ class ResumableFileSet:
       [filename, str(error), now_msec()]
     )
     cur.execute(
-      "UPDATE filelist SET finished = 2 WHERE filename = ?", 
+      f"UPDATE filelist SET finished = {FileStatus.ERROR} WHERE filename = ?", 
       [filename]
     )
     cur.close()
@@ -197,8 +221,8 @@ class ResumableFileSet:
     for filenames in sip(fname_iter, SQLITE_MAX_PARAMS):
       count += len(filenames)
       bindlist = ",".join([f"({BIND},0,0)"] * len(filenames))
-      cur.execute(f"INSERT INTO filelist(filename,finished,lease) VALUES {bindlist}", filenames)
-      cur.execute("commit")
+      with self.conn:
+        cur.execute(f"INSERT INTO filelist(filename,finished,lease) VALUES {bindlist}", filenames)
 
     cur.close()
     self._total_dirty = True
@@ -256,21 +280,25 @@ class ResumableFileSet:
 
     return meta
 
-  def mark_finished(self, fname_iter, bytes_orig:int, bytes_transcoded:int):
+  def mark_finished(self, fname_iter, bytes_orig:int, bytes_transcoded:int, status:int):
     cur = self.conn.cursor()
 
     num_files = 0
 
-    cur.execute("BEGIN")
-    for filenames in sip(fname_iter, SQLITE_MAX_PARAMS):
-      bindlist = ",".join([f"{BIND}"] * len(filenames))
-      cur.execute(f"UPDATE filelist SET finished = 1 WHERE filename in ({bindlist})", filenames)
-      num_files += len(filenames)
+    FileStatus(status) # raises exception if value not in FileStatus
 
-    cur.execute(f"UPDATE stats SET value = value + {num_files} WHERE id = 1")
-    cur.execute(f"UPDATE stats SET value = value + {bytes_orig} WHERE id = 2")
-    cur.execute(f"UPDATE stats SET value = value + {bytes_transcoded} WHERE id = 3")
-    cur.execute("COMMIT")
+    with self.conn:
+      for filenames in sip(fname_iter, SQLITE_MAX_PARAMS):
+        bindlist = ",".join([f"{BIND}"] * len(filenames))
+        cur.execute(f"UPDATE filelist SET finished = {status} WHERE filename in ({bindlist})", filenames)
+        num_files += len(filenames)
+
+      cur.execute(f"UPDATE stats SET value = value + {num_files} WHERE id = 1")
+      cur.execute(f"UPDATE stats SET value = value + {bytes_orig} WHERE id = 2")
+      cur.execute(f"UPDATE stats SET value = value + {bytes_transcoded} WHERE id = 3")
+      if status == FileStatus.MISSING:
+        cur.execute(f"UPDATE stats SET value = value + {num_files} WHERE id = 4")
+
     cur.close()
 
   def next(self, limit=None, reservation=None):
@@ -326,11 +354,20 @@ class ResumableFileSet:
   def transcoded_bytes_processed(self) -> int:
     return self._scalar_query(f"SELECT value FROM stats WHERE id = 3")
 
-  def finished(self) -> int:
-    return self._scalar_query(f"SELECT value FROM stats WHERE id = 1")
+  def finished(self, use_lookup_table:bool = True) -> int:
+    if use_lookup_table:
+      return self._scalar_query(f"SELECT value FROM stats WHERE id = 1")
+    else:
+      return self._scalar_query(f"SELECT count(*) from filelist WHERE finished != {FileStatus.AVAILABLE}")
 
   def remaining(self) -> int:
     return self.total() - self.finished()
+
+  def missing(self, use_lookup_table:bool = True) -> int:
+    if use_lookup_table:
+      return self._scalar_query(f"SELECT value FROM stats WHERE id = 4")
+    else:
+      return self._scalar_query(f"SELECT count(*) from filelist WHERE finished = {FileStatus.MISSING}")
 
   def num_leased(self) -> int:
     ts = int(now_msec())
@@ -461,11 +498,13 @@ class ResumableTransfer:
 
           reencoded = []
           original_filenames = []
+          missing = set()
+
           for filename, binary in files.items():
             if binary in (None, b''):
               if verbose:
                 print(f"{filename} is missing.")
-              self.rfs.record_error(filename, "missing file.")
+              missing.add(filename)
               continue
 
             try:
@@ -504,13 +543,28 @@ class ResumableTransfer:
 
           cf_dest.puts(reencoded, raw=True)
 
-          original_bytes = sum(( len(binary) for binary in files.values() ))
+          original_bytes = sum(( len(binary) for binary in files.values() if binary is not None ))
           transcoded_bytes = sum(( len(f["content"]) for f in reencoded  ))
 
         if meta["delete_original"]:
           cf_src.delete(original_filenames)
         
-        self.rfs.mark_finished(paths, original_bytes, transcoded_bytes)
+        complete = set(paths) - missing
+
+        self.rfs.mark_finished(
+          complete,
+          bytes_orig=original_bytes, 
+          bytes_transcoded=transcoded_bytes,
+          status=FileStatus.COMPLETE,
+        )
+
+        if len(missing):
+          self.rfs.mark_finished(
+            missing,
+            bytes_orig=0, 
+            bytes_transcoded=0,
+            status=FileStatus.MISSING,
+          )
         
         pbar.n = self.rfs.finished()
         pbar.refresh()
