@@ -265,6 +265,7 @@ def status_helper(db, eta, raw_counts):
 
   total = rt.rfs.total()
   remaining = rt.rfs.remaining()
+  missing = rt.rfs.missing()
   completed = total - remaining
   leased = rt.rfs.num_leased()
   errors = rt.rfs.num_errors()
@@ -287,6 +288,7 @@ def status_helper(db, eta, raw_counts):
 
   print(f"{remaining} remaining ({remaining/total*100.0:.2f}%)")
   print(f"{completed} completed ({completed/total*100.0:.2f}%)")
+  print(f"{missing} missing ({missing/total*100.0:.2f}%)")
   print(f"{leased} leased ({leased/total*100.0:.2f}%)")
   print(f"{errors} errors ({errors/total*100.0:.2f}%)")
   print(f"{total} total files")
