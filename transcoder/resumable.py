@@ -447,6 +447,32 @@ class ResumableTransfer:
     )
     return self.rfs.insert(paths)
 
+  def _check_if_missing_complete(
+    self,
+    missing:set[str],
+    cf_src:CloudFiles,
+    meta:dict,
+  ) -> set[str]:
+    if len(missing) == 0:
+      return set()
+
+    original_ext = {}
+    check_pretranscoded_filenames = set()
+    for filename in missing:
+      check_fname, ext = os.path.splitext(filename)
+      original_ext[check_fname] = ext
+      check_fname += "." + meta["reencode"]
+      check_pretranscoded_filenames.add(check_fname)
+
+    check_pretranscoded_filenames = cf_src.size(check_pretranscoded_filenames)
+    not_missing = set()
+    for filename, num_bytes in check_pretranscoded_filenames.items():
+      if num_bytes is None or num_bytes == 0:
+        continue
+      basename = os.path.splitext(filename)[0]
+      not_missing.add(basename + original_ext[basename])
+    return not_missing
+
   def execute(
     self, 
     progress:bool = False, 
@@ -502,8 +528,6 @@ class ResumableTransfer:
 
           for filename, binary in files.items():
             if binary in (None, b''):
-              if verbose:
-                print(f"{filename} is missing.")
               missing.add(filename)
               continue
 
@@ -548,8 +572,14 @@ class ResumableTransfer:
 
         if meta["delete_original"]:
           cf_src.delete(original_filenames)
-        
+
+        not_missing = self._check_if_missing_complete(missing, cf_src, meta)
+        missing -= not_missing
         complete = set(paths) - missing
+
+        if verbose:
+          for filename in missing:
+            print(f"{filename} is missing.")
 
         self.rfs.mark_finished(
           complete,
