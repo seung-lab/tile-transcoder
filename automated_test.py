@@ -10,6 +10,7 @@ import numpy as np
 import pyspng
 import transcoder.encoding
 import transcoder.detectors
+from pathlib import Path
 
 import sqlite3
 
@@ -435,7 +436,7 @@ def test_missing_files_handled():
     DB_PATH = "./test_missing_files.db"
     source_path = setup_test_source("missing")
     dest_path = os.path.abspath("./test_data/dest_missing/")
-    
+
     cleanup_paths(DB_PATH, dest_path)
     
     original_files = [f for f in os.listdir(source_path) if f.endswith('.png')]
@@ -446,14 +447,24 @@ def test_missing_files_handled():
     for f in missing_files:
         os.remove(os.path.join(source_path, f))
     
-    expected_transcoded = original_count - len(missing_files)
+    # +1 for pre-transcoded file defined below
+    expected_transcoded = original_count - len(missing_files) + 1
     
     init_cmd = (
         f"transcode init {source_path} {dest_path} "
         f"--encoding jpeg --level 95 --db {DB_PATH} --ext png"
     )
     subprocess.run(init_cmd, shell=True, check=True)
-    
+
+    Path(os.path.join(source_path, "already_transcoded_empty.jpeg")).touch()
+    missing_files.append("already_transcoded_empty.png")
+
+    pre_transcoded_filename = "already_transcoded_not_empty.jpeg"
+    pre_transcoded_file = os.path.join(source_path, pre_transcoded_filename)
+    with open(pre_transcoded_file, "wb") as f:
+        f.write(b"hello world")
+    missing_files.append(pre_transcoded_filename)
+
     # Add the missing filenames back into the db manually
     # (init scanned source_path after deletion, so we insert them directly)
     conn = sqlite3.connect(DB_PATH)
@@ -484,7 +495,12 @@ def test_missing_files_handled():
             "SELECT finished FROM filelist WHERE filename = ?", [f]
         ).fetchone()
         assert row is not None, f"Missing file {f} not found in db"
-        assert row[0] == 3, f"Expected status MISSING (3) for {f}, got {row[0]}"
+
+        if f == pre_transcoded_filename:
+            assert row[0] == 1, f"Expected status COMPLETE (1) for {f}, got {row[0]}"
+        else:
+            assert row[0] == 3, f"Expected status MISSING (3) for {f}, got {row[0]}"
     conn.close()
     
     cleanup_paths(DB_PATH, source_path, dest_path)
+
