@@ -34,7 +34,7 @@ class FileStatus(IntEnum):
 # for SQLite versions prior to 3.32.0 (2020-05-22) or 
 # 32766 for SQLite versions after 3.32.0. 
 # https://www.sqlite.org/limits.html
-SQLITE_MAX_PARAMS = 999
+SQLITE_MAX_PARAMS = 999 if sqlite3.sqlite_version_info < (3,32,0) else 32766
 
 # syntax that changes between sqlite and mysql
 # or easy adjustment if we ever need it
