@@ -1,8 +1,8 @@
-import click
 import multiprocessing as mp
 import os.path
 import time
 
+import click
 from tqdm import tqdm
 
 from cloudfiles import CloudFiles
@@ -75,6 +75,10 @@ def cli_main():
   """
   pass
 
+def read_txt(text_file:str):
+  with open(text_file, "rt") as f:
+    yield from ( line.rstrip('\n').rstrip('\r\n') for line in f )
+
 @cli_main.command("init")
 @click.argument("source", required=True)
 @click.argument("destination", required=False)
@@ -85,15 +89,16 @@ def cli_main():
 @click.option('--jxl-decoding-speed', default=0, type=int, help="(jpegxl) Prioritize faster decoding 0-4 (0: default).", show_default=True)
 @click.option('--delete-original', default=False, is_flag=True, help="Deletes the original file after transcoding.", show_default=True)
 @click.option('--ext', default=None, help="If present, filter files for these comma separated extensions.")
-@click.option('--db', default=None, required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
+@click.option('--db', required=True, help="Filepath of the sqlite database used for tracking progress. Different databases should be used for each job.")
 @click.option('--resin', default="noop", help="Uses a tissue detector tuned for TEM to check if a tile has tissue. Possible actions: noop, log, move, stay. move: put tile in the source directory under 'resin'. stay: log + skip copying the tile.", show_default=True)
+@click.option('--txt', 'text_file', default=None, type=str, help="Load the source file list from a text file with one file path per line.")
 def xferinit(
   source, destination, 
   encoding, compression, 
   db, level, 
   delete_original, ext,
   jxl_effort, jxl_decoding_speed,
-  resin,
+  resin, text_file,
 ):
   """(1) Create db of files from the source."""
   if compression == "same":
@@ -127,13 +132,16 @@ def xferinit(
   else:
     destination = normalize_path(destination)
 
-  paths = CloudFiles(source).list()
-  if ext:
-    ext = ext.split(',')
-    paths = ( 
-      p for p in paths 
-      if any(p.endswith(f'.{e}') for e in ext)
-    )
+  if text_file:
+    paths = read_txt(text_file)
+  else:
+    paths = CloudFiles(source).list()
+    if ext:
+      ext = ext.split(',')
+      paths = ( 
+        p for p in paths 
+        if any(p.endswith(f'.{e}') for e in ext)
+      )
 
   resin_handling = ResinHandling.NOOP
   if resin == "move":
